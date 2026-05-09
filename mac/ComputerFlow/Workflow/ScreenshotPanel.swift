@@ -81,14 +81,15 @@ struct ScreenshotPanel: View {
 
     var actionIcon: String {
         switch step.action {
-        case .navigate:  return "globe"
-        case .click:     return "cursorarrow.click"
-        case .type:      return "keyboard"
-        case .press_key: return "command"
-        case .scroll:    return "arrow.up.and.down"
-        case .wait:      return "clock"
-        case .extract:   return "doc.text.magnifyingglass"
-        case .assert:    return "checkmark.shield"
+        case "navigate":             return "globe"
+        case "click", "double_click": return "cursorarrow.click"
+        case "right_click":          return "cursorarrow.click.2"
+        case "type":                 return "keyboard"
+        case "hotkey", "press_key":  return "command"
+        case "scroll", "hscroll":    return "arrow.up.and.down"
+        case "wait":                 return "clock"
+        case "extract":              return "doc.text.magnifyingglass"
+        default:                     return "checkmark.circle"
         }
     }
 

@@ -1,9 +1,11 @@
 """
-lightcone_vlm.py — Compile a recording into workflow.json using Lightcone's
-OpenAI-compatible chat completions API (northstar-cua-fast).
+lightcone_vlm.py — Compile a recording into workflow.json using Lightcone CUA.
 
-Each pre-action screenshot + action description is sent to the model one at a
-time; consecutive keystrokes are coalesced into a single TYPE step first.
+Strategy: send events in chunks of MAX_SCREENSHOTS_PER_CALL. For recordings
+with more actions we make multiple sequential calls, each receiving the prior
+partial result as context so the model can continue numbering from where it
+left off. The partial step lists are merged and wrapped in the standard
+envelope.
 """
 
 from __future__ import annotations
@@ -11,14 +13,13 @@ from __future__ import annotations
 import base64
 import json
 import os
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-from app.compiler.lightcone_prompts import SYSTEM_PROMPT, build_user_prompt
+from app.compiler.lightcone_prompts import SYSTEM_PROMPT, CONTINUATION_PROMPT
 
-LIGHTCONE_BASE_URL = "https://api.lightcone.ai/v1"
-DEFAULT_MODEL = "northstar-cua-fast"
+DEFAULT_MODEL = "tzafon.northstar-cua-fast-1.6"
+MAX_SCREENSHOTS_PER_CALL = 5  # screenshots per Lightcone call
 
 
 # ── Public entry point ────────────────────────────────────────────────────────
@@ -31,274 +32,318 @@ def compile_with_lightcone(
     model: str = DEFAULT_MODEL,
     progress_callback: Optional[Callable[[int, int, str], Any]] = None,
 ) -> dict:
-    """Turn (events + pre-event screenshots) into a workflow.json dict."""
-    _emit(progress_callback, 1, 30, "Coalescing events…")
-    semantic = coalesce_events(events)
+    """Compile events + screenshots into a workflow.json dict via Lightcone."""
+    _emit(progress_callback, 1, 20, "Coalescing events…")
+    semantic = _coalesce_events(events)
 
-    _emit(progress_callback, 1, 45, f"Describing {len(semantic)} actions…")
-    steps: list[dict] = []
-    for idx, sem in enumerate(semantic):
-        sem.ordinal = idx + 1
-        desc = _describe_action(sem, screenshots_dir, model=model)
-        steps.append(_to_sop_step(sem, desc))
+    # Split into chunks of MAX_SCREENSHOTS_PER_CALL
+    chunks = _chunk_events(semantic, MAX_SCREENSHOTS_PER_CALL)
+    total_chunks = len(chunks)
 
-        pct = 45 + int(40 * (idx + 1) / max(1, len(semantic)))
-        _emit(progress_callback, 2, min(pct, 90), f"Step {idx+1}/{len(semantic)}: {desc.intent[:60]}")
+    all_steps: list[dict] = []
+    workflow_name = name
+    variables: list[dict] = []
 
-    _emit(progress_callback, 3, 95, "Finalising workflow…")
-    return _build_envelope(workflow_id, name, _infer_router(steps), [], steps)
+    for chunk_idx, chunk in enumerate(chunks):
+        chunk_start = sum(len(c) for c in chunks[:chunk_idx])
+        pct_start = 35 + int(chunk_idx / total_chunks * 50)
+        _emit(
+            progress_callback, 1, pct_start,
+            f"Analysing actions {chunk_start + 1}–{chunk_start + len(chunk)}"
+            + (f" of {len(semantic)}" if total_chunks > 1 else "") + "…"
+        )
+
+        user_content = _build_user_content(
+            chunk, screenshots_dir,
+            step_offset=chunk_start,
+            is_continuation=chunk_idx > 0,
+            prior_steps=all_steps,
+        )
+
+        raw_json = _call_lightcone(user_content, model, is_continuation=chunk_idx > 0)
+
+        chunk_steps = raw_json.get("steps") or []
+        all_steps.extend(chunk_steps)
+
+        if chunk_idx == 0:
+            workflow_name = raw_json.get("name") or name
+            variables = raw_json.get("variables") or []
+        else:
+            # Merge any new variables from continuation calls
+            existing_var_names = {v.get("name") for v in variables}
+            for v in (raw_json.get("variables") or []):
+                if v.get("name") not in existing_var_names:
+                    variables.append(v)
+
+    _emit(progress_callback, 2, 85, "Finalising workflow…")
+    merged_llm_output = {"name": workflow_name, "steps": all_steps, "variables": variables}
+    return _build_envelope(workflow_id, name, merged_llm_output, semantic)
 
 
 # ── Event coalescing ──────────────────────────────────────────────────────────
 
-@dataclass
-class SemanticEvent:
-    kind: str               # "click" | "right_click" | "type" | "hotkey"
-    t_start_ms: float
-    t_end_ms: float
-    screenshot_rel: str     # path relative to recording root
-    x: Optional[float] = None
-    y: Optional[float] = None
-    screen_w: Optional[float] = None
-    screen_h: Optional[float] = None
-    text: Optional[str] = None
-    keys: Optional[list[str]] = None
-    ordinal: int = 0
+def _coalesce_events(events: list[dict]) -> list[dict]:
+    """Merge consecutive keystrokes into type steps; keep clicks/hotkeys as-is."""
+    out: list[dict] = []
+    key_buffer: list[dict] = []
 
-
-def coalesce_events(events: list[dict]) -> list[SemanticEvent]:
-    out: list[SemanticEvent] = []
-    buffer_keys: list[dict] = []
-
-    def flush_keys() -> None:
-        if not buffer_keys:
+    def flush():
+        if not key_buffer:
             return
-        text = "".join((e.get("key") or "") for e in buffer_keys)
-        first = buffer_keys[0]
-        out.append(SemanticEvent(
-            kind="type",
-            t_start_ms=first.get("t", 0),
-            t_end_ms=buffer_keys[-1].get("t", 0),
-            screenshot_rel=first.get("screenshot", ""),
-            text=text,
-        ))
-        buffer_keys.clear()
+        text = "".join(e.get("key") or "" for e in key_buffer)
+        first = key_buffer[0]
+        out.append({
+            "kind": "type",
+            "t": first.get("t", 0),
+            "text": text,
+            "screenshot": first.get("screenshot", ""),
+        })
+        key_buffer.clear()
 
     for ev in events:
         kind = ev.get("kind", "")
         if kind in ("click", "right_click"):
-            flush_keys()
-            out.append(SemanticEvent(
-                kind=kind,
-                t_start_ms=ev.get("t", 0),
-                t_end_ms=ev.get("t", 0),
-                screenshot_rel=ev.get("screenshot", ""),
-                x=ev.get("x"), y=ev.get("y"),
-                screen_w=ev.get("screenW"), screen_h=ev.get("screenH"),
-            ))
+            flush()
+            out.append(ev)
         elif kind == "key":
             key_char = ev.get("key") or ""
-            modifiers = ev.get("modifiers", 0)
+            mods = ev.get("modifiers", 0)
             CMD, ALT, CTRL = 1 << 20, 1 << 19, 1 << 18
-            has_mod = bool(modifiers & (CMD | ALT | CTRL))
-            if has_mod or _is_control_char(key_char):
-                flush_keys()
-                keys = _mods_to_keys(modifiers)
+            if bool(mods & (CMD | ALT | CTRL)) or _is_control(key_char):
+                flush()
+                keys = _mod_names(mods)
                 if key_char:
                     keys.append(key_char)
-                out.append(SemanticEvent(
-                    kind="hotkey",
-                    t_start_ms=ev.get("t", 0),
-                    t_end_ms=ev.get("t", 0),
-                    screenshot_rel=ev.get("screenshot", ""),
-                    keys=keys,
-                ))
+                out.append({
+                    "kind": "hotkey",
+                    "t": ev.get("t", 0),
+                    "keys": keys,
+                    "screenshot": ev.get("screenshot", ""),
+                })
             else:
-                buffer_keys.append(ev)
+                key_buffer.append(ev)
         elif kind == "keymod":
-            buffer_keys.append({**ev, "_is_mod": True})
+            key_buffer.append(ev)
+        # skip unknown kinds
 
-    flush_keys()
+    flush()
     return out
 
 
-def _is_control_char(s: str) -> bool:
+def _chunk_events(events: list[dict], size: int) -> list[list[dict]]:
+    if not events:
+        return [[]]
+    return [events[i:i + size] for i in range(0, len(events), size)]
+
+
+def _is_control(s: str) -> bool:
     return bool(s) and (ord(s[0]) < 32 or s in ("\r", "\n", "\t", "\x7f"))
 
 
-def _mods_to_keys(flags: int) -> list[str]:
-    keys: list[str] = []
-    if flags & (1 << 20): keys.append("cmd")
-    if flags & (1 << 19): keys.append("alt")
-    if flags & (1 << 18): keys.append("ctrl")
-    if flags & (1 << 17): keys.append("shift")
-    return keys
+def _mod_names(flags: int) -> list[str]:
+    out = []
+    if flags & (1 << 20): out.append("cmd")
+    if flags & (1 << 19): out.append("alt")
+    if flags & (1 << 18): out.append("ctrl")
+    if flags & (1 << 17): out.append("shift")
+    return out
 
 
-# ── Lightcone description ─────────────────────────────────────────────────────
+# ── Build multimodal message content ─────────────────────────────────────────
 
-@dataclass
-class ActionDescription:
-    intent: str
-    ui_element: str
-    app_context: str
-    executor: str       # "kernel" | "computer_use"
-    confidence: float
-
-
-def _describe_action(
-    sem: SemanticEvent,
+def _build_user_content(
+    chunk: list[dict],
     screenshots_dir: Path,
-    model: str = DEFAULT_MODEL,
-) -> ActionDescription:
-    shot_path = _resolve_screenshot(sem.screenshot_rel, screenshots_dir)
+    step_offset: int = 0,
+    is_continuation: bool = False,
+    prior_steps: list[dict] | None = None,
+) -> list[dict]:
+    """
+    Build user message content for one chunk of semantic events.
+    Each event gets a text description + its screenshot (if available).
+    """
+    content: list[dict] = []
 
-    user_text = build_user_prompt(
-        kind=sem.kind,
-        x=sem.x, y=sem.y,
-        screen_w=sem.screen_w, screen_h=sem.screen_h,
-        text=sem.text,
-        keys=sem.keys,
+    if is_continuation and prior_steps:
+        prior_summary = json.dumps({"steps": prior_steps[-3:]}, indent=None)
+        content.append({"type": "text", "text": (
+            f"Continuing workflow analysis. The previous steps ended at step {step_offset}. "
+            f"Last completed steps for context:\n{prior_summary}\n\n"
+            "Now analyse the NEXT batch of actions below and continue the workflow JSON "
+            f"(start at step {step_offset + 1}). Return ONLY the JSON for the new steps.\n\n"
+        )})
+    else:
+        content.append({"type": "text", "text": (
+            f"I recorded {step_offset + len(chunk)} user action(s) on macOS. "
+            "Below are the actions with their pre-action screenshots. "
+            "Produce a complete workflow JSON.\n\n"
+            "ACTIONS:\n"
+        )})
+
+    for i, ev in enumerate(chunk):
+        kind = ev.get("kind", "")
+        step_num = step_offset + i + 1
+
+        if kind == "click":
+            desc = f"Step {step_num}: CLICK at ({int(ev.get('x', 0))}, {int(ev.get('y', 0))}) on {int(ev.get('screenW', 0))}×{int(ev.get('screenH', 0))} screen"
+        elif kind == "right_click":
+            desc = f"Step {step_num}: RIGHT-CLICK at ({int(ev.get('x', 0))}, {int(ev.get('y', 0))})"
+        elif kind == "type":
+            preview = (ev.get("text") or "")[:80].replace("\n", "\\n")
+            desc = f'Step {step_num}: TYPE "{preview}"'
+        elif kind == "hotkey":
+            desc = f"Step {step_num}: HOTKEY {'+'.join(ev.get('keys') or [])}"
+        else:
+            desc = f"Step {step_num}: {kind.upper()}"
+
+        content.append({"type": "text", "text": desc})
+
+        shot_rel = ev.get("screenshot", "")
+        shot_path = _resolve_screenshot(shot_rel, screenshots_dir)
+        if shot_path:
+            b64 = base64.b64encode(shot_path.read_bytes()).decode()
+            content.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
+            })
+
+    if is_continuation:
+        content.append({"type": "text", "text": "\nReturn ONLY the JSON for these new steps (no name/variables needed, just {\"steps\": [...]}). Continue numbering from where the prior steps ended:"})
+    else:
+        content.append({"type": "text", "text": "\nNow return the complete workflow JSON:"})
+
+    return content
+
+
+# ── Lightcone API call ────────────────────────────────────────────────────────
+
+def _call_lightcone(user_content: list[dict], model: str, is_continuation: bool = False) -> dict:
+    """Call Lightcone with retries and a long timeout. Returns parsed workflow dict."""
+    key = os.environ.get("LIGHTCONE_API_KEY") or os.environ.get("TZAFON_API_KEY")
+    if not key:
+        raise RuntimeError("LIGHTCONE_API_KEY not set")
+
+    import tzafon
+    import httpx
+
+    client = tzafon.Lightcone(
+        api_key=key,
+        timeout=httpx.Timeout(connect=15.0, read=180.0, write=60.0, pool=15.0),
+        max_retries=3,
     )
 
-    # Build message content — text first, then image if available
-    content: list[dict] = [{"type": "text", "text": user_text}]
-    if shot_path and shot_path.exists():
-        b64 = base64.b64encode(shot_path.read_bytes()).decode()
-        content.append({
-            "type": "image_url",
-            "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
-        })
+    system = CONTINUATION_PROMPT if is_continuation else SYSTEM_PROMPT
 
-    try:
-        client = _openai_client()
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": content},
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.2,
-            max_tokens=512,
-        )
+    response = client.chat.create_completion(
+        model=model,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_content},
+        ],
+        temperature=0.1,
+        max_tokens=4096,
+    )
+
+    if isinstance(response, dict):
+        raw = response["choices"][0]["message"]["content"] or "{}"
+    else:
         raw = response.choices[0].message.content or "{}"
-        data = json.loads(raw)
-        return ActionDescription(
-            intent=str(data.get("intent", sem.kind)).strip(),
-            ui_element=str(data.get("ui_element", "")).strip(),
-            app_context=str(data.get("app_context", "")).strip(),
-            executor=str(data.get("executor", "computer_use")),
-            confidence=float(data.get("confidence", 0.5)),
-        )
-    except Exception as exc:
-        print(f"[CF compiler] Lightcone error on step {sem.ordinal}: {exc}")
-        return ActionDescription(
-            intent=_fallback_intent(sem),
-            ui_element="",
-            app_context="",
-            executor="computer_use",
-            confidence=0.0,
-        )
+
+    raw = raw.strip()
+    if raw.startswith("```"):
+        raw = raw.split("```", 2)[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+        raw = raw.rsplit("```", 1)[0].strip()
+
+    return json.loads(raw)
 
 
-def _fallback_intent(sem: SemanticEvent) -> str:
-    if sem.kind == "click":
-        return f"Click at ({int(sem.x or 0)}, {int(sem.y or 0)})"
-    if sem.kind == "right_click":
-        return f"Right-click at ({int(sem.x or 0)}, {int(sem.y or 0)})"
-    if sem.kind == "type":
-        return f'Type "{(sem.text or "")[:40]}"'
-    if sem.kind == "hotkey":
-        return f"Press {'+'.join(sem.keys or [])}"
-    return sem.kind
-
-
-# ── SOP step assembly ─────────────────────────────────────────────────────────
-
-def _to_sop_step(sem: SemanticEvent, desc: ActionDescription) -> dict:
-    step_id = f"s{sem.ordinal}"
-    executor_kind = desc.executor if desc.executor in ("kernel", "computer_use") else "computer_use"
-    base = {
-        "id": step_id,
-        "n": sem.ordinal,
-        "intent": desc.intent,
-        "notes": desc.ui_element,
-        "app_context": desc.app_context,
-        "screenshot": sem.screenshot_rel,
-        "approved": False,
-        "needsReview": desc.confidence < 0.6,
-    }
-
-    executor_obj: dict = {
-        "kind": executor_kind,
-        "entryFn": "browser_agent.execute_step" if executor_kind == "kernel" else "desktop_agent.execute_step",
-    }
-
-    if sem.kind == "click":
-        return {
-            **base,
-            "action": "click",
-            "target": {
-                "kind": "description",
-                "description": desc.ui_element or desc.intent,
-                "x": sem.x, "y": sem.y,
-                "screenW": sem.screen_w, "screenH": sem.screen_h,
-            },
-            "value": None,
-            "executor": executor_obj,
-        }
-    if sem.kind == "right_click":
-        return {
-            **base,
-            "action": "right_click",
-            "target": {
-                "kind": "description",
-                "description": desc.ui_element or desc.intent,
-                "x": sem.x, "y": sem.y,
-            },
-            "value": None,
-            "executor": executor_obj,
-        }
-    if sem.kind == "type":
-        return {
-            **base,
-            "action": "type",
-            "target": {"kind": "description", "description": desc.ui_element or desc.intent},
-            "value": {"kind": "literal", "text": sem.text or ""},
-            "executor": executor_obj,
-        }
-    if sem.kind == "hotkey":
-        return {
-            **base,
-            "action": "hotkey",
-            "target": {"kind": "none"},
-            "value": {"kind": "keys", "keys": sem.keys or []},
-            "executor": executor_obj,
-        }
-    return {**base, "action": sem.kind, "target": {"kind": "none"}, "value": None}
-
+# ── Envelope assembly ─────────────────────────────────────────────────────────
 
 def _build_envelope(
     workflow_id: str,
     name: str,
-    router: str,
-    variables: list[dict],
-    steps: list[dict],
+    llm_output: dict,
+    semantic: list[dict],
 ) -> dict:
+    """Validate LLM output, infer router, and wrap in the full workflow.json envelope."""
     from datetime import datetime, timezone
     now = datetime.now(timezone.utc).isoformat()
+
+    final_name = llm_output.get("name") or name
+
+    raw_steps = llm_output.get("steps") or []
+    VALID_ACTIONS = {
+        "navigate", "click", "double_click", "right_click",
+        "drag", "scroll", "hscroll", "type", "hotkey",
+        "wait", "screenshot", "extract",
+    }
+
+    steps = []
+    for i, step in enumerate(raw_steps):
+        executor = step.get("executor") or {}
+        if isinstance(executor, str):
+            executor = {"kind": executor}
+        kind = executor.get("kind", "computer_use")
+        if kind not in ("kernel", "computer_use", "northstar", "local"):
+            kind = "computer_use"
+        entry_fn = "browser_agent.execute_step" if kind == "kernel" else "desktop_agent.execute_step"
+        executor = {"kind": kind, "entryFn": entry_fn}
+
+        target = step.get("target") or {}
+        if isinstance(target, str):
+            target = {"kind": "description", "description": target}
+        if "kind" not in target:
+            target["kind"] = "description"
+
+        action = step.get("action") or "click"
+        if action not in VALID_ACTIONS:
+            action = "click"
+
+        value = step.get("value")
+        if isinstance(value, dict) and "text" in value and "kind" not in value:
+            value = value["text"]
+
+        steps.append({
+            "id": step.get("id") or f"s{i+1}",
+            "n": step.get("n") or i + 1,
+            "action": action,
+            "intent": step.get("intent") or "",
+            "target": target,
+            "value": value,
+            "executor": executor,
+            "screenshot": step.get("screenshot") or (semantic[i].get("screenshot") if i < len(semantic) else None),
+            "approved": False,
+            "needsReview": bool(step.get("needsReview", False)),
+            "notes": step.get("notes") or "",
+        })
+
+    executor_kinds = {s["executor"]["kind"] for s in steps}
+    has_browser = "kernel" in executor_kinds
+    has_desktop = "computer_use" in executor_kinds or "northstar" in executor_kinds
+    if has_browser and has_desktop:
+        router = "auto"
+    elif has_browser:
+        router = "kernel"
+    else:
+        router = "northstar"
+
+    variables = llm_output.get("variables") or []
+    for i, v in enumerate(variables):
+        if "id" not in v:
+            v["id"] = v.get("name") or f"var{i}"
+
     return {
         "id": workflow_id,
         "schemaVersion": 1,
-        "name": name,
+        "name": final_name,
         "createdAt": now,
         "updatedAt": now,
         "source": {
             "kind": "recording",
             "videoPath": f"videos/{workflow_id}.mp4",
             "telemetryPath": f"videos/{workflow_id}.events.json",
-            "eventScreenshotsDir": "screens/events",
         },
         "execution": {"router": router, "background": True, "concurrency": 1},
         "variables": variables,
@@ -307,27 +352,7 @@ def _build_envelope(
     }
 
 
-def _infer_router(steps: list[dict]) -> str:
-    # Default to auto; runner resolves per-step based on executor.kind
-    return "auto"
-
-
-# ── OpenAI-compatible client pointed at Lightcone ────────────────────────────
-
-_client_singleton: Any = None
-
-
-def _openai_client() -> Any:
-    global _client_singleton
-    if _client_singleton is not None:
-        return _client_singleton
-    key = os.environ.get("LIGHTCONE_API_KEY") or os.environ.get("TZAFON_API_KEY")
-    if not key:
-        raise RuntimeError("LIGHTCONE_API_KEY not set")
-    from openai import OpenAI
-    _client_singleton = OpenAI(api_key=key, base_url=LIGHTCONE_BASE_URL)
-    return _client_singleton
-
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _resolve_screenshot(rel: str, screenshots_dir: Path) -> Optional[Path]:
     if not rel:

@@ -12,11 +12,21 @@ class ScreenRecorder: NSObject, ObservableObject {
     // Which display to record — nil means "first available"
     var selectedDisplayID: CGDirectDisplayID?
 
+    // Set by AppState before calling startRecording so the video lands in the same
+    // tmp folder as events.json and screenshots.
+    var recordingRootDir: URL?
+
     func startRecording() async throws {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let tmpDir = appSupport.appendingPathComponent("ComputerFlow/tmp", isDirectory: true)
-        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
-        let url = tmpDir.appendingPathComponent("\(UUID().uuidString).mp4")
+        let rootDir: URL
+        if let dir = recordingRootDir {
+            rootDir = dir
+        } else {
+            let tmpDir = appSupport.appendingPathComponent("ComputerFlow/tmp", isDirectory: true)
+            try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+            rootDir = tmpDir
+        }
+        let url = rootDir.appendingPathComponent("recording.mp4")
         outputURL = url
 
         let availableContent = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)

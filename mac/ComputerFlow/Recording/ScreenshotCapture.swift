@@ -8,11 +8,27 @@ import UniformTypeIdentifiers
 enum ScreenshotCapture {
 
     @discardableResult
-    static func captureJPEG(to url: URL, quality: CGFloat = 0.85) -> CGSize? {
-        // CGWindowListCreateImage works correctly on macOS 14+ with Screen Recording permission.
-        // CGDisplayCreateImage is deprecated and returns black on recent macOS.
+    static func captureJPEG(to url: URL, displayID: CGDirectDisplayID? = nil, quality: CGFloat = 0.85) -> CGSize? {
+        // Determine the bounds of the target display so we only capture that screen.
+        // CGWindowListCreateImage with a specific rect crops to that display.
+        let bounds: CGRect
+        if let id = displayID {
+            bounds = CGDisplayBounds(id)
+        } else if let screen = NSScreen.main {
+            // Convert NSScreen frame (bottom-left origin) to CG coordinates (top-left origin).
+            let screenHeight = NSScreen.screens.map { $0.frame.maxY }.max() ?? screen.frame.maxY
+            bounds = CGRect(
+                x: screen.frame.minX,
+                y: screenHeight - screen.frame.maxY,
+                width: screen.frame.width,
+                height: screen.frame.height
+            )
+        } else {
+            bounds = .null
+        }
+
         let image = CGWindowListCreateImage(
-            .null,                          // .null = full screen bounds
+            bounds,
             .optionOnScreenOnly,
             kCGNullWindowID,
             [.bestResolution, .boundsIgnoreFraming]

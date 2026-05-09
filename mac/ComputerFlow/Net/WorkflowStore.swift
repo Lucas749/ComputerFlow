@@ -40,8 +40,8 @@ class WorkflowStore: ObservableObject {
             recentWorkflows[idx] = workflow
         } else {
             recentWorkflows.insert(workflow, at: 0)
-            if recentWorkflows.count > 5 {
-                recentWorkflows = Array(recentWorkflows.prefix(5))
+            if recentWorkflows.count > 20 {
+                recentWorkflows = Array(recentWorkflows.prefix(20))
             }
         }
         save()

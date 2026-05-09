@@ -1,56 +1,93 @@
 """
-lightcone_prompts.py — All prompts and structured output for the Lightcone compiler.
+lightcone_prompts.py — Prompts for the Lightcone CUA compiler.
 """
 
-SYSTEM_PROMPT = """You are the ComputerFlow action describer.
+SYSTEM_PROMPT = """You are the ComputerFlow workflow compiler.
 
-You are given:
-  1. A short prompt describing ONE user action (click, type, right-click, or hotkey).
-  2. A screenshot captured IMMEDIATELY BEFORE that action took place.
+You receive a sequence of user actions recorded on macOS. Each action has:
+- A kind: click, right_click, type, or hotkey
+- Coordinates (for clicks)
+- A screenshot taken IMMEDIATELY BEFORE the action
 
-Return ONLY a JSON object (no prose, no markdown) with these fields:
+Your job is to produce a complete workflow JSON object.
+
+OUTPUT: Return ONLY a valid JSON object matching this exact schema — no prose, no markdown, no code fences:
+
 {
-  "intent": "Short imperative phrase describing what the user wanted (<= 12 words)",
-  "ui_element": "Description of the exact on-screen element targeted (button label, field placeholder, menu item) — precise enough for a vision model to re-locate it",
-  "app_context": "Which app/window/page the user is in (e.g. 'Safari on example.com', 'Finder', 'Excel Sheet1')",
-  "executor": "kernel" | "computer_use",
-  "confidence": 0.0-1.0
+  "name": "Short descriptive workflow name (3-6 words)",
+  "steps": [
+    {
+      "id": "s1",
+      "n": 1,
+      "action": "click" | "type" | "hotkey" | "navigate" | "scroll" | "right_click",
+      "intent": "Short imperative phrase: what the user is doing",
+      "target": {
+        "kind": "description",
+        "description": "Precise description of the UI element (button label, field name, menu item)",
+        "x": 123,
+        "y": 456,
+        "screenW": 1512,
+        "screenH": 982
+      },
+      "value": null | "text to type" | {"kind": "var", "ref": "VariableName"},
+      "executor": {"kind": "kernel" | "computer_use"},
+      "screenshot": "screenshots/ev_0000.jpg",
+      "approved": false,
+      "needsReview": false,
+      "notes": ""
+    }
+  ],
+  "variables": []
 }
 
 Rules:
-- Be concrete. Say "Click the blue 'Submit' button in the signup form footer" not "Click a button".
-- Use executor="kernel" when the action is inside a web browser. Use executor="computer_use" for native desktop apps.
-- If typing, ui_element should describe the input field; intent should quote the typed text if short.
-- Set confidence < 0.6 if you cannot identify the element clearly.
-- Return ONLY the JSON object, nothing else."""
+1. Merge consecutive key events into a single "type" step. The value is the full typed text.
+2. EXECUTOR ASSIGNMENT — look at the screenshot to determine the context:
+   - Use executor.kind="kernel" when the action is happening INSIDE a web browser (Safari, Chrome, Firefox, Arc).
+   - Use executor.kind="computer_use" for all native macOS desktop apps (Finder, Excel, Slack, terminal, etc.) and any non-browser context.
+3. If a typed value looks like user-specific data (IDs, names, emails, amounts), lift it to a variable: value={"kind":"var","ref":"VariableName"} and add {"name":"VariableName","type":"string","default":""} to variables.
+4. Set needsReview=true for destructive actions (delete, submit payment, send message) or when you cannot confidently identify the target element.
+5. Step IDs are "s1", "s2", etc. n is 1-based.
+6. Be concrete about target.description — say "blue Submit button in the signup form footer", not "button".
+7. Return ONLY the JSON object. No other text."""
 
+CONTINUATION_PROMPT = """You are the ComputerFlow workflow compiler, continuing analysis of a longer recording.
 
-def build_user_prompt(kind: str, x=None, y=None, screen_w=None, screen_h=None,
-                      text=None, keys=None) -> str:
-    if kind == "click":
-        return (
-            f"The user clicked at screen coordinates ({int(x or 0)}, {int(y or 0)}) "
-            f"on a {int(screen_w or 0)}×{int(screen_h or 0)} display. "
-            "The screenshot was captured immediately before the click. "
-            "Describe what UI element the user clicked and what they intended."
-        )
-    if kind == "right_click":
-        return (
-            f"The user right-clicked at ({int(x or 0)}, {int(y or 0)}). "
-            "Describe the element and what context menu they were opening."
-        )
-    if kind == "type":
-        preview = (text or "").replace("\n", "\\n")[:80]
-        return (
-            f'The user typed: "{preview}". '
-            "The screenshot shows the state before typing began. "
-            "Describe which input field they were typing into."
-        )
-    if kind == "hotkey":
-        combo = "+".join(keys or [])
-        return (
-            f"The user pressed the keyboard shortcut: {combo}. "
-            "From the screenshot, describe what app/context they were in "
-            "and what this shortcut most likely does."
-        )
-    return "Describe the user action shown in the screenshot."
+You will receive:
+- The last few already-analysed steps (for context and correct numbering)
+- The NEXT batch of user actions with their pre-action screenshots
+
+Your job is to produce workflow steps for ONLY the new actions shown.
+
+OUTPUT: Return ONLY a valid JSON object with a single "steps" key — no name, no variables, no prose:
+
+{
+  "steps": [
+    {
+      "id": "s4",
+      "n": 4,
+      "action": "click" | "type" | "hotkey" | "navigate" | "scroll" | "right_click",
+      "intent": "Short imperative phrase: what the user is doing",
+      "target": {
+        "kind": "description",
+        "description": "Precise description of the UI element",
+        "x": 123,
+        "y": 456,
+        "screenW": 1512,
+        "screenH": 982
+      },
+      "value": null | "text to type" | {"kind": "var", "ref": "VariableName"},
+      "executor": {"kind": "kernel" | "computer_use"},
+      "screenshot": "screenshots/ev_0003.jpg",
+      "approved": false,
+      "needsReview": false,
+      "notes": ""
+    }
+  ]
+}
+
+Rules:
+1. Continue step numbering from where the prior steps ended (shown in context).
+2. EXECUTOR ASSIGNMENT: kernel = inside a web browser; computer_use = native macOS app.
+3. Set needsReview=true for destructive actions or unclear targets.
+4. Return ONLY the JSON object {\"steps\": [...]}. No other text."""

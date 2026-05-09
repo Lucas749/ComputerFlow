@@ -28,6 +28,7 @@ class EventTelemetry: ObservableObject {
 
     private(set) var rootDir: URL?
     private(set) var screenshotsDir: URL?
+    private var captureDisplayID: CGDirectDisplayID?
 
     private let captureQueue = DispatchQueue(
         label: "computerflow.screenshot-capture",
@@ -38,8 +39,9 @@ class EventTelemetry: ObservableObject {
 
     /// Begin capturing.  Creates a fresh directory under `Application Support`
     /// keyed by the given recordingID so every recording is isolated.
-    func start(recordingID: String) throws {
+    func start(recordingID: String, displayID: CGDirectDisplayID? = nil) throws {
         events = []
+        captureDisplayID = displayID
 
         let appSupport = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -151,7 +153,7 @@ class EventTelemetry: ObservableObject {
         guard let dir = screenshotsDir else { return "" }
         let name = String(format: "ev_%04d.jpg", index)
         let url = dir.appendingPathComponent(name)
-        ScreenshotCapture.captureJPEG(to: url)
+        ScreenshotCapture.captureJPEG(to: url, displayID: captureDisplayID)
         return "screenshots/\(name)"
     }
 }

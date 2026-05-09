@@ -73,15 +73,16 @@ class AppState: ObservableObject {
         }
         status = .recording
         recordingPanelController?.close()
-        recordingPanelController = RecordingPanelController()
+        recordingPanelController = RecordingPanelController(displayID: selectedDisplayID)
         recordingPanelController?.show()
 
         let recID = UUID().uuidString
         print("[CF] Starting recording id=\(recID)")
-        do { try telemetry.start(recordingID: recID) }
+        do { try telemetry.start(recordingID: recID, displayID: selectedDisplayID) }
         catch { print("[CF] Telemetry start failed: \(error)") }
 
         recorder.selectedDisplayID = selectedDisplayID
+        recorder.recordingRootDir = telemetry.rootDir
         Task {
             do {
                 try await recorder.startRecording()
@@ -167,8 +168,10 @@ class AppState: ObservableObject {
         Task {
             do {
                 let workflow = try await BackendClient.shared.getWorkflow(id: workflowId)
-                WorkflowStore.shared.addOrUpdate(workflow)
+                WorkflowStore.shared.addOrUpdate(workflow)   // persist immediately
                 status = .ready
+                recordingPanelController?.close()
+                recordingPanelController = nil
                 let controller = WorkflowConfirmationWindowController(workflow: workflow)
                 confirmationWindowController = controller
                 controller.show()

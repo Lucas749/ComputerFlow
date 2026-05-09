@@ -18,7 +18,7 @@ import aiofiles
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session  # noqa: F401 — used by get_db dependency
 
 from app.models import get_db
 from app.store import (
@@ -83,9 +83,9 @@ async def upload_workflow(
     name = Path(video.filename or "Untitled").stem.replace("_", " ").replace("-", " ").title()
     store.create_workflow(workflow_id, name=name)
 
-    # Fire-and-forget compile task
+    # Fire-and-forget compile task (uses its own DB session — request session closes after return)
     asyncio.create_task(
-        _run_compile(workflow_id=workflow_id, name=name, db=db)
+        _run_compile(workflow_id=workflow_id, name=name)
     )
 
     return {"id": workflow_id, "status": "compiling"}
@@ -139,25 +139,29 @@ async def update_workflow(
 
 # ── Background compile pipeline ───────────────────────────────────────────────
 
-async def _run_compile(workflow_id: str, name: str, db: Session) -> None:
-    """
-    Background task: event-driven compile.
+async def _run_compile(workflow_id: str, name: str) -> None:
+    """Background task: compile a recorded workflow.
 
-    Preferred path:  Mac client uploaded per-event screenshots → use Lightcone
-                     CUA model to describe each semantic action directly.
-
-    Fallback path:   No screenshots uploaded (e.g. legacy client) → fall back
-                     to the ffmpeg + Claude pipeline.
+    Set COMPILER=claude in the environment to use Claude Sonnet instead of Lightcone.
     """
+    import os
     from app.api.stream import get_compile_queue
-    from app.compiler.lightcone_vlm import compile_with_lightcone
+    from app.models import SessionLocal
     from app.store import (
         WorkflowStore,
         event_screenshots_dir,
         events_path as get_events_path,
     )
 
+    compiler_backend = os.environ.get("COMPILER", "lightcone").lower()
+
+    if compiler_backend == "claude":
+        from app.compiler.claude_vlm import compile_with_claude as compile_fn
+    else:
+        from app.compiler.lightcone_vlm import compile_with_lightcone as compile_fn
+
     queue = get_compile_queue(workflow_id)
+    db = SessionLocal()
     store = WorkflowStore(db)
 
     loop = asyncio.get_event_loop()
@@ -184,11 +188,10 @@ async def _run_compile(workflow_id: str, name: str, db: Session) -> None:
             except Exception:
                 events_data = []
 
-        # Always use Lightcone — it handles empty events gracefully
         await emit(0, 15, "Using pre-action screenshots…")
         workflow_json = await loop.run_in_executor(
             None,
-            lambda: compile_with_lightcone(
+            lambda: compile_fn(
                 workflow_id=workflow_id,
                 events=events_data,
                 screenshots_dir=shots_dir,
@@ -206,3 +209,5 @@ async def _run_compile(workflow_id: str, name: str, db: Session) -> None:
             {"stage": "error", "progress": 0, "subline": str(exc), "error": True}
         )
         raise
+    finally:
+        db.close()

@@ -12,23 +12,23 @@ class WorkflowConfirmationWindowController {
     }
 
     func show() {
-        let view = WorkflowConfirmationView(workflow: workflow)
+        let view = RecordingReviewView(workflow: workflow, store: WorkflowStore.shared)
         let hosting = NSHostingView(rootView: view)
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 618, height: 520),
-            styleMask: [.borderless],
+            contentRect: NSRect(x: 0, y: 0, width: 900, height: 580),
+            styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
-        window.backgroundColor = .clear
-        window.isOpaque = false
-        window.hasShadow = true
+        window.title = workflow.name
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.isMovableByWindowBackground = true
+        window.backgroundColor = NSColor(Theme.winBg)
         window.contentView = hosting
         window.center()
-        window.level = .normal
         window.isReleasedWhenClosed = false
-        window.orderFront(nil)
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         self.window = window
@@ -40,256 +40,510 @@ class WorkflowConfirmationWindowController {
     }
 }
 
-// MARK: - WorkflowConfirmationView (Screen 4)
-struct WorkflowConfirmationView: View {
+// MARK: - RecordingReviewView
+struct RecordingReviewView: View {
     @State var workflow: WorkflowModel
-    @State private var backgroundRun = false
-    @State private var droppedInputs: URL? = nil
-    @State private var isDragOver = false
-    @State private var deployFlash = false
-    @State private var isDeploying = false
-    @State private var deploySuccess = false
+    let store: WorkflowStore
+    @State private var selectedStepId: String?
+    @State private var saved = false
 
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Theme.winBg)
-
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-
-            VStack(spacing: 0) {
-                // Title Bar
-                titleBar
-
-                Divider().background(Theme.bdiv)
-
-                // Body
-                HStack(spacing: 0) {
-                    // Left pane — steps
-                    leftPane
-
-                    Divider().background(Theme.bdiv)
-
-                    // Right pane — execution
-                    rightPane
-                }
-            }
-        }
-        .frame(width: 618)
-        .fixedSize(horizontal: false, vertical: true)
-        .shadow(color: .black.opacity(0.6), radius: 28, x: 0, y: 20)
+    var selectedStep: WorkflowStep? {
+        workflow.steps.first { $0.id == selectedStepId }
     }
 
-    // MARK: - Title Bar
+    var approvedCount: Int { workflow.steps.filter { $0.approved }.count }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            titleBar
+            Divider().opacity(0.07)
+            HStack(spacing: 0) {
+                stepList
+                Divider().opacity(0.07)
+                detailPane
+            }
+            .frame(maxHeight: .infinity)
+            Divider().opacity(0.07)
+            footer
+        }
+        .background(Theme.winBg)
+        .onAppear {
+            selectedStepId = workflow.steps.first?.id
+        }
+    }
+
+    // MARK: - Title bar
     var titleBar: some View {
-        HStack(spacing: 8) {
-            // Traffic lights
+        HStack(spacing: 10) {
+            // Traffic lights spacer
             HStack(spacing: 5) {
-                ForEach([Theme.red, Theme.amb, Theme.grn], id: \.self) { color in
-                    Circle().fill(color).frame(width: 11, height: 11)
+                ForEach([Theme.red, Theme.amb, Theme.grn], id: \.self) { c in
+                    Circle().fill(c).frame(width: 11, height: 11)
                 }
             }
             .padding(.leading, 14)
 
             Spacer()
 
-            // Editable title
             TextField("Workflow name", text: $workflow.name)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(Theme.t1)
                 .multilineTextAlignment(.center)
                 .textFieldStyle(.plain)
-                .frame(maxWidth: 260)
-                .onChange(of: workflow.name) { _, _ in
-                    Task { try? await BackendClient.shared.updateWorkflow(workflow) }
-                }
+                .frame(maxWidth: 280)
 
             Spacer()
-            // Spacer to balance traffic lights
-            Color.clear.frame(width: 14 + 33)
+
+            // Export JSON
+            Button(action: exportJSON) {
+                Text("Export")
+                    .font(.system(size: 12))
+                    .foregroundColor(Theme.t3)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Theme.ctrl)
+                    .cornerRadius(5)
+                    .overlay(RoundedRectangle(cornerRadius: 5).stroke(Theme.bdiv, lineWidth: 1))
+            }
+            .buttonStyle(PlainButtonStyle())
+            .padding(.trailing, 14)
         }
-        .padding(.vertical, 12)
+        .frame(height: 48)
         .background(Theme.winBg)
     }
 
-    // MARK: - Left Pane
-    var leftPane: some View {
+    // MARK: - Step list (left rail)
+    var stepList: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Extracted Steps")
+            Text("Steps")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(Theme.t3)
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 14)
                 .padding(.top, 14)
                 .padding(.bottom, 8)
 
             ScrollView {
                 VStack(spacing: 2) {
                     ForEach(workflow.steps) { step in
-                        StepRow(step: step)
+                        ReviewStepRow(
+                            step: step,
+                            isSelected: selectedStepId == step.id,
+                            workflowDir: workflowDataDir()
+                        ) {
+                            selectedStepId = step.id
+                        }
                     }
                 }
+                .padding(.horizontal, 8)
+                .padding(.bottom, 12)
             }
-            .frame(maxHeight: 360)
-
-            Spacer()
         }
-        .frame(maxWidth: .infinity)
+        .frame(width: 230)
+        .background(Theme.surf.opacity(0.25))
     }
 
-    // MARK: - Right Pane
-    var rightPane: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Execution")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(Theme.t3)
-                .padding(.top, 14)
-
-            // Background Run toggle
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Background Run")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Theme.t1)
-                    Text("KERNEL headless")
-                        .font(Theme.mono(10))
-                        .foregroundColor(Theme.t3)
-                }
+    // MARK: - Detail pane (right)
+    @ViewBuilder
+    var detailPane: some View {
+        if let step = selectedStep {
+            ReviewDetailPane(
+                step: step,
+                workflowDir: workflowDataDir(),
+                onApprove: { approveStep(step) },
+                onRemove: { removeStep(step) }
+            )
+        } else {
+            VStack {
                 Spacer()
-                CFToggle(isOn: $backgroundRun)
+                Image(systemName: "cursorarrow.click.2")
+                    .font(.system(size: 32))
+                    .foregroundColor(Theme.t3)
+                Text("Select a step to review")
+                    .font(.system(size: 13))
+                    .foregroundColor(Theme.t3)
+                    .padding(.top, 8)
+                Spacer()
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(Theme.ctrl)
-            .cornerRadius(8)
+            .frame(maxWidth: .infinity)
+        }
+    }
 
-            // Drop Zone
-            dropZone
+    // MARK: - Footer
+    var footer: some View {
+        HStack {
+            Button("Remove Step") {
+                if let step = selectedStep { removeStep(step) }
+            }
+            .font(.system(size: 12))
+            .foregroundColor(Theme.red)
+            .buttonStyle(PlainButtonStyle())
+            .disabled(selectedStep == nil)
 
             Spacer()
 
-            // Deploy button
-            deployButton
-
-            // Open in Editor
-            Button(action: openEditor) {
-                HStack {
-                    Text("Open in Editor")
-                    Image(systemName: "arrow.right")
-                }
-                .font(.system(size: 13, weight: .medium))
+            Text("\(approvedCount) of \(workflow.steps.count) approved")
+                .font(.system(size: 12))
                 .foregroundColor(Theme.t2)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 9)
-                .background(Theme.ctrl)
-                .cornerRadius(8)
+
+            Button("Approve All") {
+                approveAll()
+            }
+            .font(.system(size: 12, weight: .medium))
+            .foregroundColor(Theme.t2)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Theme.ctrl)
+            .cornerRadius(6)
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.bdiv, lineWidth: 1))
+            .buttonStyle(PlainButtonStyle())
+
+            Button(action: saveAndClose) {
+                HStack(spacing: 6) {
+                    if saved {
+                        Image(systemName: "checkmark")
+                    } else {
+                        Image(systemName: "square.and.arrow.down")
+                    }
+                    Text(saved ? "Saved!" : "Save Workflow")
+                        .fontWeight(.semibold)
+                }
+                .font(.system(size: 13))
+                .foregroundColor(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 7)
+                .background(saved ? Theme.grn : Theme.blue)
+                .cornerRadius(7)
             }
             .buttonStyle(PlainButtonStyle())
         }
-        .padding(.horizontal, 14)
-        .padding(.bottom, 16)
-        .frame(width: 196)
-    }
-
-    // MARK: - Drop Zone
-    var dropZone: some View {
-        VStack(spacing: 6) {
-            Image(systemName: "arrow.down.circle")
-                .font(.system(size: 20))
-                .foregroundColor(isDragOver ? Theme.blue : Theme.t3)
-            Text("Drop inputs.json")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(isDragOver ? Theme.blue : Theme.t2)
-            Text("to loop this task")
-                .font(.system(size: 11))
-                .foregroundColor(Theme.t3)
-
-            if let url = droppedInputs {
-                Text("✓ \(url.lastPathComponent)")
-                    .font(Theme.mono(10))
-                    .foregroundColor(Theme.grn)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 18)
-        .background(Theme.surf.opacity(0.5))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(isDragOver ? Theme.blue : Theme.bdiv, style: StrokeStyle(lineWidth: 1, dash: [5]))
-        )
-        .cornerRadius(8)
-        .onDrop(of: [UTType.json, UTType.fileURL], isTargeted: $isDragOver) { providers in
-            handleDrop(providers)
-        }
-    }
-
-    // MARK: - Deploy Button
-    var deployButton: some View {
-        Button(action: deploy) {
-            HStack(spacing: 6) {
-                if isDeploying {
-                    ProgressView().scaleEffect(0.7).tint(.white)
-                } else if deploySuccess {
-                    Image(systemName: "checkmark")
-                } else {
-                    Image(systemName: "arrow.up.circle.fill")
-                }
-                Text(deploySuccess ? "Deployed!" : "Deploy Agent")
-                    .font(.system(size: 13, weight: .semibold))
-            }
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(deploySuccess ? Theme.grn : Theme.ctrl)
-                    .shadow(color: deploySuccess ? Theme.grn.opacity(0.4) : .clear, radius: 8)
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-        .disabled(isDeploying)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 11)
+        .background(Theme.winBg)
     }
 
     // MARK: - Actions
-    func deploy() {
-        isDeploying = true
-        var inputs: [[String: String]]? = nil
-
-        if let url = droppedInputs,
-           let data = try? Data(contentsOf: url),
-           let parsed = try? JSONDecoder().decode([[String: String]].self, from: data) {
-            inputs = parsed
+    func approveStep(_ step: WorkflowStep) {
+        guard let idx = workflow.steps.firstIndex(where: { $0.id == step.id }) else { return }
+        workflow.steps[idx].approved = true
+        workflow.steps[idx].needsReview = false
+        // Auto-advance to next step
+        if idx + 1 < workflow.steps.count {
+            selectedStepId = workflow.steps[idx + 1].id
         }
+    }
 
-        let capturedInputs = inputs
+    func removeStep(_ step: WorkflowStep) {
+        workflow.steps.removeAll { $0.id == step.id }
+        // Renumber
+        for i in workflow.steps.indices { workflow.steps[i].n = i + 1 }
+        selectedStepId = workflow.steps.first?.id
+    }
+
+    func approveAll() {
+        for i in workflow.steps.indices {
+            workflow.steps[i].approved = true
+            workflow.steps[i].needsReview = false
+        }
+    }
+
+    func saveAndClose() {
+        store.addOrUpdate(workflow)
+        Task { try? await BackendClient.shared.updateWorkflow(workflow) }
+        saved = true
         Task {
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
             await MainActor.run {
-                AppState.shared.startRun(workflowId: workflow.id, inputs: capturedInputs)
-                isDeploying = false
-                deploySuccess = true
-            }
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
-            await MainActor.run {
-                deploySuccess = false
                 AppState.shared.confirmationWindowController?.close()
                 AppState.shared.confirmationWindowController = nil
             }
         }
     }
 
-    @MainActor func openEditor() {
-        AppState.shared.openEditor(workflow: workflow)
+    func exportJSON() {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted
+        encoder.dateEncodingStrategy = .iso8601
+        guard let data = try? encoder.encode(workflow) else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = "\(workflow.name).json"
+        if panel.runModal() == .OK, let url = panel.url {
+            try? data.write(to: url)
+        }
     }
 
-    func handleDrop(_ providers: [NSItemProvider]) -> Bool {
-        guard let provider = providers.first else { return false }
-        provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
-            if let data = item as? Data,
-               let url = URL(dataRepresentation: data, relativeTo: nil) {
-                DispatchQueue.main.async { droppedInputs = url }
+    // Base path where the backend stores screenshots for this workflow
+    func workflowDataDir() -> URL? {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return appSupport.appendingPathComponent("ComputerFlow/tmp", isDirectory: true)
+    }
+}
+
+// MARK: - ReviewStepRow
+struct ReviewStepRow: View {
+    let step: WorkflowStep
+    let isSelected: Bool
+    let workflowDir: URL?
+    let onTap: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            // Thumbnail
+            thumbnailView
+                .frame(width: 48, height: 32)
+                .cornerRadius(4)
+                .overlay(RoundedRectangle(cornerRadius: 4).stroke(Theme.bdiv, lineWidth: 1))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(step.actionLabel)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(Theme.t1)
+                    .lineLimit(1)
+                let detail = step.displayIntent
+                Text(detail)
+                    .font(.system(size: 10.5))
+                    .foregroundColor(Theme.t2)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            statusDot
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(isSelected ? Theme.surf : Color.clear)
+        .cornerRadius(7)
+        .overlay(RoundedRectangle(cornerRadius: 7).stroke(isSelected ? Theme.bdiv : Color.clear, lineWidth: 1))
+        .contentShape(Rectangle())
+        .onTapGesture { onTap() }
+    }
+
+    @ViewBuilder
+    var thumbnailView: some View {
+        if let img = loadThumbnail() {
+            Image(nsImage: img)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+        } else {
+            LinearGradient(
+                colors: stepColors,
+                startPoint: .topLeading, endPoint: .bottomTrailing
+            )
+        }
+    }
+
+    var stepColors: [Color] {
+        let palette: [[Color]] = [
+            [Color(hex: "#1a1a2e"), Color(hex: "#16213e")],
+            [Color(hex: "#0f3460"), Color(hex: "#533483")],
+            [Color(hex: "#1b1b2f"), Color(hex: "#2b2d42")],
+            [Color(hex: "#16213e"), Color(hex: "#0f3460")],
+            [Color(hex: "#0a0a1a"), Color(hex: "#1a1a2e")],
+        ]
+        return palette[step.n % palette.count]
+    }
+
+    func loadThumbnail() -> NSImage? {
+        guard let rel = step.screenshot, !rel.isEmpty else { return nil }
+        // step.screenshot is like "screenshots/ev_0000.jpg" — look in tmp recording dirs
+        guard let base = workflowDir else { return nil }
+        // Search all recording dirs for this screenshot file
+        let name = URL(fileURLWithPath: rel).lastPathComponent
+        if let dirs = try? FileManager.default.contentsOfDirectory(at: base, includingPropertiesForKeys: nil) {
+            for dir in dirs {
+                let candidate = dir.appendingPathComponent("screenshots").appendingPathComponent(name)
+                if FileManager.default.fileExists(atPath: candidate.path),
+                   let img = NSImage(contentsOf: candidate) {
+                    return img
+                }
             }
         }
-        return true
+        return nil
+    }
+
+    @ViewBuilder
+    var statusDot: some View {
+        if step.needsReview {
+            Circle().fill(Theme.amb).frame(width: 7, height: 7)
+        } else if step.approved {
+            Circle().fill(Theme.grn).frame(width: 7, height: 7)
+        } else {
+            Circle().stroke(Theme.t3.opacity(0.5), lineWidth: 1).frame(width: 7, height: 7)
+        }
+    }
+}
+
+// MARK: - ReviewDetailPane
+struct ReviewDetailPane: View {
+    let step: WorkflowStep
+    let workflowDir: URL?
+    let onApprove: () -> Void
+    let onRemove: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Step header
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(Theme.surf)
+                        .overlay(Circle().stroke(Theme.bdiv, lineWidth: 1))
+                        .frame(width: 28, height: 28)
+                    Text("\(step.n)")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Theme.t2)
+                }
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 8) {
+                        Text(step.actionLabel)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(Theme.t1)
+                        executorBadge
+                        if step.needsReview {
+                            needsReviewBadge
+                        }
+                    }
+                    Text(step.displayIntent)
+                        .font(.system(size: 12))
+                        .foregroundColor(Theme.t2)
+                        .lineLimit(2)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 22)
+            .padding(.top, 20)
+            .padding(.bottom, 14)
+
+            // Screenshot
+            screenshotView
+                .frame(maxWidth: .infinity)
+                .frame(height: 280)
+                .cornerRadius(10)
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.bdiv, lineWidth: 1))
+                .padding(.horizontal, 22)
+                .padding(.bottom, 16)
+
+            // Target description
+            if let desc = step.target.description, !desc.isEmpty {
+                HStack(alignment: .top, spacing: 8) {
+                    Text("Target")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(Theme.t3)
+                        .frame(width: 48, alignment: .leading)
+                    Text(desc)
+                        .font(Theme.mono(11))
+                        .foregroundColor(Theme.t2)
+                        .lineLimit(3)
+                }
+                .padding(.horizontal, 22)
+                .padding(.bottom, 12)
+            }
+
+            // Value chip
+            if let val = step.value {
+                HStack(spacing: 8) {
+                    Text("Value")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(Theme.t3)
+                        .frame(width: 48, alignment: .leading)
+                    Text(val.displayString)
+                        .font(Theme.mono(11))
+                        .foregroundColor(val.isVariable ? Theme.blue : Theme.t1)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(val.isVariable ? Theme.blue.opacity(0.12) : Theme.surf)
+                        .cornerRadius(5)
+                }
+                .padding(.horizontal, 22)
+                .padding(.bottom, 12)
+            }
+
+            Spacer()
+
+            // Approve button
+            HStack(spacing: 10) {
+                Button(action: onApprove) {
+                    HStack(spacing: 6) {
+                        Image(systemName: step.approved ? "checkmark.circle.fill" : "checkmark.circle")
+                        Text(step.approved ? "Approved" : "Approve Step")
+                            .fontWeight(.medium)
+                    }
+                    .font(.system(size: 13))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 9)
+                    .background(step.approved ? Theme.grn : Theme.blue)
+                    .cornerRadius(8)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+            .padding(.horizontal, 22)
+            .padding(.bottom, 16)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    var screenshotView: some View {
+        if let img = loadScreenshot() {
+            Image(nsImage: img)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .background(Color.black)
+        } else {
+            ZStack {
+                LinearGradient(
+                    colors: [Color(hex: "#0d1117"), Color(hex: "#161b22")],
+                    startPoint: .topLeading, endPoint: .bottomTrailing
+                )
+                VStack(spacing: 8) {
+                    Image(systemName: "photo")
+                        .font(.system(size: 28))
+                        .foregroundColor(Color.white.opacity(0.2))
+                    Text("No screenshot")
+                        .font(.system(size: 12))
+                        .foregroundColor(Color.white.opacity(0.2))
+                }
+            }
+        }
+    }
+
+    var executorBadge: some View {
+        let isKernel = step.executor?.kind == "kernel"
+        return Text(isKernel ? "Browser" : "Desktop")
+            .font(.system(size: 10, weight: .medium))
+            .foregroundColor(isKernel ? Theme.blue : Theme.amb)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .background((isKernel ? Theme.blue : Theme.amb).opacity(0.12))
+            .cornerRadius(4)
+    }
+
+    var needsReviewBadge: some View {
+        Text("Needs review")
+            .font(.system(size: 10, weight: .medium))
+            .foregroundColor(Theme.amb)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .background(Theme.amb.opacity(0.12))
+            .cornerRadius(4)
+    }
+
+    func loadScreenshot() -> NSImage? {
+        guard let rel = step.screenshot, !rel.isEmpty else { return nil }
+        guard let base = workflowDir else { return nil }
+        let name = URL(fileURLWithPath: rel).lastPathComponent
+        if let dirs = try? FileManager.default.contentsOfDirectory(at: base, includingPropertiesForKeys: nil) {
+            for dir in dirs.sorted(by: { $0.lastPathComponent > $1.lastPathComponent }) {
+                let candidate = dir.appendingPathComponent("screenshots").appendingPathComponent(name)
+                if FileManager.default.fileExists(atPath: candidate.path),
+                   let img = NSImage(contentsOf: candidate) {
+                    return img
+                }
+            }
+        }
+        return nil
     }
 }
 
@@ -304,7 +558,6 @@ struct CFToggle: View {
                     .fill(isOn ? Theme.grn : Theme.ctrl)
                     .shadow(color: isOn ? Theme.grn.opacity(0.35) : .clear, radius: 5)
                     .frame(width: 38, height: 22)
-
                 Circle()
                     .fill(Color.white)
                     .frame(width: 16, height: 16)

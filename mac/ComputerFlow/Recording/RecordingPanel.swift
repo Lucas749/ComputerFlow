@@ -19,9 +19,14 @@ private class ClickableHostingView<V: View>: NSHostingView<V> {
 class RecordingPanelController {
     private var panel: ClickablePanel?
     private var hostingView: ClickableHostingView<AnyView>?
+    private let displayID: CGDirectDisplayID?
 
     static let panelW: CGFloat = 500
     static let panelH: CGFloat = 220
+
+    init(displayID: CGDirectDisplayID? = nil) {
+        self.displayID = displayID
+    }
 
     func show() {
         let view = AnyView(
@@ -47,7 +52,17 @@ class RecordingPanelController {
         panel.ignoresMouseEvents = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
-        if let screen = NSScreen.main {
+        // Place pill on the selected display, bottom-centre
+        let targetScreen: NSScreen? = {
+            if let id = displayID {
+                return NSScreen.screens.first { screen in
+                    let key = "NSScreenNumber"
+                    return (screen.deviceDescription[NSDeviceDescriptionKey(rawValue: key)] as? CGDirectDisplayID) == id
+                }
+            }
+            return NSScreen.main
+        }()
+        if let screen = targetScreen ?? NSScreen.main {
             let sf = screen.visibleFrame
             let x = sf.minX + (sf.width - Self.panelW) / 2
             let y = sf.minY + 16
@@ -105,7 +120,7 @@ struct RecordingPillView: View {
                     AngularGradient(colors: [Theme.t3, Theme.t2], center: .center),
                     style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
                 )
-                .frame(width: 22, height: 22)
+                .frame(width: 20, height: 20)
                 .rotationEffect(.degrees(spinDeg))
                 .onAppear {
                     withAnimation(.linear(duration: 0.88).repeatForever(autoreverses: false)) {
@@ -113,32 +128,14 @@ struct RecordingPillView: View {
                     }
                 }
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(appState.compileSubline)
-                    .font(.system(size: 12, weight: .medium))
+            HStack(spacing: 0) {
+                Text("Translating visual intent")
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(Theme.t1)
-                    .lineLimit(1)
-                    .id(appState.compileSubline)
-                    .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .move(edge: .bottom)),
-                        removal:   .opacity.combined(with: .move(edge: .top))
-                    ))
-                    .animation(.easeInOut(duration: 0.3), value: appState.compileSubline)
-
-                // Progress bar
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Color.white.opacity(0.10)).frame(height: 2)
-                        Capsule()
-                            .fill(Color.white.opacity(0.55))
-                            .frame(width: geo.size.width * (appState.compileProgress / 100), height: 2)
-                            .animation(.easeInOut(duration: 0.4), value: appState.compileProgress)
-                    }
-                }
-                .frame(height: 2)
+                TranslatingDotsView()
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 24)
         .frame(width: 360, height: 58)
         .background(
             Capsule()
@@ -283,6 +280,26 @@ struct DotView: View {
                     scale = 1.0; opacity = 0.86
                 }
             }
+    }
+}
+
+// MARK: - TranslatingDotsView
+struct TranslatingDotsView: View {
+    @State private var phase = 0
+    let timer = Timer.publish(every: 0.45, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(0..<3, id: \.self) { i in
+                Circle()
+                    .fill(Color.white.opacity(i < phase ? 0.85 : 0.25))
+                    .frame(width: 4, height: 4)
+            }
+        }
+        .padding(.leading, 4)
+        .onReceive(timer) { _ in
+            phase = (phase + 1) % 4
+        }
     }
 }
 
