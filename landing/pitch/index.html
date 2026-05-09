@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ComputerFlow — Pitch</title>
+<link rel="icon" type="image/png" href="../uploads/pasted-1778362911069-0.png">
+
+<script type="application/json" id="speaker-notes">
+[
+  "ComputerFlow is a Mac menu bar app that turns any repetitive computer task into a fully autonomous AI agent — with zero code. You record yourself doing the task once, and the software handles everything else.",
+  "There are three steps. Record: hit command-OR and just work normally. Compile: our AI analyzes every frame, identifies each action, and writes an agentic script — powered by Northstar, a computer-use model from Lightcone. Deploy: the agent runs headlessly via Kernel, a background execution environment, with a live Picture-in-Picture feed so you stay in control."
+]
+</script>
+
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#000;font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',Helvetica,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden}
+
+@keyframes dotWave{0%,100%{opacity:.22;transform:scale(.74)}50%{opacity:.88;transform:scale(1)}}
+@keyframes recBlink{0%,100%{opacity:1}50%{opacity:.2}}
+@keyframes spinRing{to{transform:rotate(360deg)}}
+@keyframes cursorDrift{0%{transform:translate(50px,40px)}18%{transform:translate(140px,70px)}36%{transform:translate(100px,130px)}54%{transform:translate(210px,88px)}72%{transform:translate(72px,165px)}100%{transform:translate(50px,40px)}}
+@keyframes pillFadeIn{from{opacity:0;transform:scale(.97) translateY(6px)}to{opacity:1;transform:scale(1) translateY(0)}}
+
+deck-stage section{
+  background:#06060a;
+  width:1920px;height:1080px;
+  position:relative;overflow:hidden;
+  display:flex;
+}
+
+/* ── SLIDE 1 ── */
+.s1-glow{position:absolute;top:-320px;left:-240px;width:1000px;height:1000px;border-radius:50%;background:radial-gradient(ellipse,rgba(100,100,255,0.07) 0%,transparent 65%);pointer-events:none}
+.s1-left{flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 100px 88px 120px;position:relative;z-index:2}
+.s1-overline{font-size:15px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:rgba(255,255,255,.28);margin-bottom:28px;display:flex;align-items:center;gap:10px}
+.s1-icon{width:32px;height:32px;border-radius:8px}
+.s1-h1{font-size:90px;font-weight:700;letter-spacing:-.042em;line-height:.98;color:#fff;margin-bottom:28px}
+.s1-tagline{font-size:28px;font-weight:400;color:rgba(255,255,255,.4);line-height:1.4;margin-bottom:64px;max-width:540px}
+.s1-bullets{display:flex;flex-direction:column;gap:26px}
+.s1-bullet{display:flex;align-items:flex-start;gap:16px}
+.s1-bullet-num{width:28px;height:28px;border-radius:50%;border:1px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:rgba(255,255,255,.4);flex-shrink:0;margin-top:2px}
+.s1-bullet-text{font-size:24px;color:rgba(255,255,255,.55);line-height:1.45}
+.s1-bullet-text strong{color:rgba(255,255,255,.85);font-weight:500}
+.s1-right{width:760px;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:60px 72px 60px 0}
+.s1-demo-frame{width:100%;border-radius:16px;overflow:hidden;box-shadow:0 0 0 0.5px rgba(255,255,255,.08),0 48px 140px rgba(0,0,0,.9)}
+
+/* ── SLIDE 2 ── */
+.s2-glow{position:absolute;bottom:-280px;right:-280px;width:800px;height:800px;border-radius:50%;background:radial-gradient(ellipse,rgba(0,100,255,0.07) 0%,transparent 65%);pointer-events:none}
+.s2-inner{flex:1;display:flex;flex-direction:column;padding:80px 100px 0}
+.s2-header{margin-bottom:64px}
+.s2-overline{font-size:13px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:rgba(255,255,255,.28);margin-bottom:16px}
+.s2-h2{font-size:72px;font-weight:700;letter-spacing:-.042em;color:#fff;line-height:1.01}
+.s2-steps{display:flex;gap:0;align-items:stretch;flex:1}
+.s2-step{flex:1;display:flex;flex-direction:column;padding:0 52px;position:relative}
+.s2-step:not(:last-child)::after{content:'';position:absolute;top:0;right:0;width:1px;height:100%;background:linear-gradient(to bottom,rgba(255,255,255,.07) 0%,transparent 100%)}
+.s2-step-num{font-size:12px;font-weight:700;letter-spacing:.1em;color:rgba(255,255,255,.18);margin-bottom:24px;font-family:'SF Mono','Menlo',monospace}
+.s2-step-title{font-size:38px;font-weight:700;letter-spacing:-.025em;color:#fff;margin-bottom:12px;line-height:1.08}
+.s2-step-desc{font-size:20px;color:rgba(255,255,255,.42);line-height:1.52;margin-bottom:32px}
+.s2-step-demo{flex:1;border-radius:13px;overflow:hidden;box-shadow:0 0 0 0.5px rgba(255,255,255,.07),0 16px 48px rgba(0,0,0,.6);display:flex;flex-direction:column;min-height:0;margin-bottom:0}
+.s2-dbar{height:28px;background:#111113;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;padding:0 10px;gap:5.5;flex-shrink:0}
+
+/* POWERED BY BAR */
+.powered-bar{height:72px;flex-shrink:0;display:flex;align-items:center;justify-content:center;gap:48px;border-top:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.02)}
+.powered-label{font-size:12px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:rgba(255,255,255,.22)}
+.powered-sep{width:1px;height:24px;background:rgba(255,255,255,.1)}
+.powered-item{display:flex;align-items:center;gap:10px}
+
+/* Home link (fixed, top-left of viewport) */
+.pitch-home{position:fixed;top:18px;left:20px;z-index:9999;display:flex;align-items:center;gap:9px;padding:8px 14px 8px 10px;background:rgba(20,20,24,0.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.09);border-radius:100px;color:rgba(255,255,255,.85);font-size:13px;font-weight:600;letter-spacing:-.01em;text-decoration:none;font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;transition:background .15s,border-color .15s}
+.pitch-home:hover{background:rgba(30,30,36,.88);border-color:rgba(255,255,255,.18)}
+.pitch-home img{width:22px;height:22px;border-radius:5px}
+</style>
+
+<script src="/pitch/deck-stage.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+
+<a href="/" class="pitch-home" aria-label="Back to ComputerFlow">
+  <img src="../uploads/pasted-1778362911069-0.png" alt="">
+  ComputerFlow
+</a>
+
+<deck-stage>
+
+  <!-- ═══ SLIDE 1 — WHAT IS IT ═══ -->
+  <section data-screen-label="01 What is it">
+    <div class="s1-glow"></div>
+
+    <div class="s1-left">
+      <div class="s1-overline">
+        <img src="../uploads/pasted-1778362911069-0.png" class="s1-icon" alt="">
+        ComputerFlow
+      </div>
+      <h1 class="s1-h1">Turn any task<br>into an agent.</h1>
+      <p class="s1-tagline">Record once. Your computer<br>handles it forever.</p>
+      <div class="s1-bullets">
+        <div class="s1-bullet">
+          <div class="s1-bullet-num">1</div>
+          <p class="s1-bullet-text"><strong>No code, no config.</strong> Just record yourself doing a task normally — ComputerFlow does the rest.</p>
+        </div>
+        <div class="s1-bullet">
+          <div class="s1-bullet-num">2</div>
+          <p class="s1-bullet-text"><strong>AI-powered compilation.</strong> Every action is identified and turned into a precise, editable agentic script.</p>
+        </div>
+        <div class="s1-bullet">
+          <div class="s1-bullet-num">3</div>
+          <p class="s1-bullet-text"><strong>Runs in the cloud.</strong> Record on your Mac, hand off to Kernel or Computer Use by Lightcone — with a live Picture-in-Picture feed.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="s1-right">
+      <div class="s1-demo-frame">
+        <div style="height:36px;background:#111113;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;padding:0 13px;gap:7px">
+          <div style="width:12px;height:12px;border-radius:50%;background:#FF5F57"></div>
+          <div style="width:12px;height:12px;border-radius:50%;background:#FFBD2E"></div>
+          <div style="width:12px;height:12px;border-radius:50%;background:#28C840"></div>
+        </div>
+        <div id="s1-demo" style="height:520px"></div>
+      </div>
+    </div>
+
+    <!-- Powered by bar -->
+    <div class="powered-bar" style="position:absolute;bottom:0;left:0;right:0">
+      <span class="powered-label">Powered by</span>
+      <div class="powered-sep"></div>
+      <img src="../uploads/pasted-1778363127600-0.png" style="height:22px;filter:invert(1);opacity:.5" alt="Kernel">
+      <div class="powered-sep"></div>
+      <div class="powered-item">
+        <img src="../uploads/pasted-1778363140530-0.png" style="height:20px;opacity:.5" alt="Lightcone">
+        <span style="font-size:15px;font-weight:500;color:rgba(255,255,255,.36);letter-spacing:-.01em">Northstar by Lightcone</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ SLIDE 2 — HOW IT WORKS ═══ -->
+  <section data-screen-label="02 How it Works">
+    <div class="s2-glow"></div>
+
+    <div class="s2-inner">
+      <div class="s2-header">
+        <div class="s2-overline">How it works</div>
+        <h2 class="s2-h2">Three steps.<br>Zero friction.</h2>
+      </div>
+
+      <div class="s2-steps">
+
+        <!-- Step 1: Record -->
+        <div class="s2-step">
+          <div class="s2-step-num">01 —</div>
+          <div class="s2-step-title">Record</div>
+          <p class="s2-step-desc">Hit ⌘OR. Do your task normally. ComputerFlow watches from the menu bar — no setup, no interruptions.</p>
+          <div class="s2-step-demo">
+            <div class="s2-dbar">
+              <div style="width:9px;height:9px;border-radius:50%;background:#FF5F57"></div>
+              <div style="width:9px;height:9px;border-radius:50%;background:#FFBD2E"></div>
+              <div style="width:9px;height:9px;border-radius:50%;background:#28C840"></div>
+            </div>
+            <div id="s2-record" style="flex:1;min-height:0"></div>
+          </div>
+        </div>
+
+        <!-- Step 2: Compile -->
+        <div class="s2-step">
+          <div class="s2-step-num">02 —</div>
+          <div class="s2-step-title">Compile</div>
+          <p class="s2-step-desc">Northstar by Lightcone analyzes every frame, identifies actions, and generates a precise agentic script you can edit.</p>
+          <div class="s2-step-demo">
+            <div class="s2-dbar">
+              <div style="width:9px;height:9px;border-radius:50%;background:#FF5F57"></div>
+              <div style="width:9px;height:9px;border-radius:50%;background:#FFBD2E"></div>
+              <div style="width:9px;height:9px;border-radius:50%;background:#28C840"></div>
+            </div>
+            <div id="s2-compile" style="flex:1;min-height:0"></div>
+          </div>
+        </div>
+
+        <!-- Step 3: Deploy -->
+        <div class="s2-step">
+          <div class="s2-step-num">03 —</div>
+          <div class="s2-step-title">Deploy</div>
+          <p class="s2-step-desc">Agents execute in the cloud via Kernel — computer use powered by Lightcone's Northstar model. Watch live, pause, stop, or take over any time.</p>
+          <div class="s2-step-demo">
+            <div class="s2-dbar">
+              <div style="width:9px;height:9px;border-radius:50%;background:#FF5F57"></div>
+              <div style="width:9px;height:9px;border-radius:50%;background:#FFBD2E"></div>
+              <div style="width:9px;height:9px;border-radius:50%;background:#28C840"></div>
+            </div>
+            <div id="s2-deploy" style="flex:1;min-height:0"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- POWERED BY BAR -->
+      <div class="powered-bar">
+        <span class="powered-label">Powered by</span>
+        <div class="powered-sep"></div>
+        <div class="powered-item">
+          <img src="../uploads/pasted-1778363127600-0.png" style="height:22px;filter:invert(1);opacity:.55" alt="Kernel">
+        </div>
+        <div class="powered-sep"></div>
+        <div class="powered-item">
+          <img src="../uploads/pasted-1778363140530-0.png" style="height:20px;opacity:.55" alt="Northstar by Lightcone">
+          <span style="font-size:15px;font-weight:500;color:rgba(255,255,255,.38);letter-spacing:-.01em">Northstar by Lightcone</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</deck-stage>
+
+<!-- ═══ REACT ═══ -->
+<script type="text/babel">
+const {useState, useEffect} = React;
+const F = "-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif";
+const M = "'SF Mono','Menlo','Fira Code',monospace";
+
+/* ── S1: Dark Menu Bar Popup ── */
+function S1MenuBar() {
+  const [hov, setHov] = useState(null);
+  const flows = [
+    {name:'Google Search Trending Topic', time:'0m ago'},
+    {name:'Zoom In Paste Chrome', time:'1m ago'},
+    {name:'Open New Tab Search', time:'24m ago'},
+  ];
+
+  return (
+    <div style={{width:'100%',height:'100%',background:'radial-gradient(ellipse at 28% 28%,rgba(12,16,48,0.72) 0%,transparent 50%),linear-gradient(145deg,#0c0c14,#0e0e16)',display:'flex',alignItems:'flex-start',justifyContent:'flex-end',position:'relative'}}>
+      {/* Menu bar strip */}
+      <div style={{position:'absolute',top:0,left:0,right:0,height:28,background:'rgba(8,8,14,0.92)',backdropFilter:'blur(20px)',borderBottom:'1px solid rgba(255,255,255,.06)',display:'flex',alignItems:'center',justifyContent:'flex-end',paddingRight:12,gap:14}}>
+        <span style={{color:'rgba(255,255,255,.35)',fontSize:12,fontFamily:F}}>May 9  10:42</span>
+        <img src="../uploads/pasted-1778362911069-0.png" style={{width:16,height:16,borderRadius:4}} alt=""/>
+      </div>
+      {/* Caret */}
+      <div style={{marginTop:32,marginRight:14,display:'flex',flexDirection:'column',alignItems:'flex-end'}}>
+        <div style={{marginRight:6,marginBottom:-1,zIndex:5,width:0,height:0,borderLeft:'7px solid transparent',borderRight:'7px solid transparent',borderBottom:'8px solid #2a2a2c'}}/>
+        {/* Panel */}
+        <div style={{width:310,background:'#2a2a2c',borderRadius:15,overflow:'hidden',boxShadow:'0 8px 36px rgba(0,0,0,.8),0 0 0 0.5px rgba(255,255,255,.1)'}}>
+          <div style={{padding:'16px 17px 10px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <span style={{color:'#fff',fontSize:19,fontWeight:700,fontFamily:F}}>ComputerFlow</span>
+            <div style={{display:'flex',alignItems:'center',gap:6}}>
+              <div style={{width:8,height:8,borderRadius:'50%',background:'#32D74B',boxShadow:'0 0 8px rgba(50,215,75,.6)'}}/>
+              <span style={{color:'#32D74B',fontSize:14,fontWeight:500,fontFamily:F}}>Ready</span>
+            </div>
+          </div>
+          <div style={{padding:'0 12px 10px'}}>
+            <div style={{height:50,background:'#3a3a3c',borderRadius:11,display:'flex',alignItems:'center',padding:'0 14px',gap:11,cursor:'pointer',border:'1px solid rgba(255,255,255,.06)'}}>
+              <div style={{width:10,height:10,borderRadius:'50%',background:'#FF453A',animation:'recBlink 2s ease-in-out infinite',flexShrink:0}}/>
+              <span style={{color:'#fff',fontSize:17,fontWeight:600,flex:1,fontFamily:F}}>Start Recording</span>
+              <span style={{color:'rgba(255,255,255,.4)',fontSize:11.5,fontFamily:M,background:'rgba(255,255,255,.09)',border:'1px solid rgba(255,255,255,.13)',borderRadius:5,padding:'2px 8px',whiteSpace:'nowrap'}}>⌘OR</span>
+            </div>
+          </div>
+          <div style={{padding:'2px 15px 9px',display:'flex',alignItems:'center',gap:7}}>
+            <span style={{color:'rgba(255,255,255,.28)',fontSize:14,fontFamily:F}}>🖥  No displays</span>
+          </div>
+          <div style={{padding:'5px 15px 5px',display:'flex',justifyContent:'space-between'}}>
+            <span style={{color:'rgba(255,255,255,.3)',fontSize:13.5,fontFamily:F}}>Recent</span>
+            <span style={{color:'rgba(255,255,255,.28)',fontSize:13.5,fontFamily:F}}>All &gt;</span>
+          </div>
+          {flows.map((f,i)=>(
+            <div key={i} onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)}
+              style={{display:'flex',alignItems:'center',gap:11,padding:'9px 12px',background:hov===i?'rgba(255,255,255,.05)':'transparent',transition:'background .1s',cursor:'pointer'}}>
+              <div style={{width:34,height:34,borderRadius:9,background:'rgba(255,255,255,.08)',border:'1px solid rgba(255,255,255,.09)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,color:'rgba(255,255,255,.5)',flexShrink:0}}>→</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{color:'#fff',fontSize:14.5,fontWeight:500,fontFamily:F,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.name}</div>
+                <div style={{color:'rgba(255,255,255,.3)',fontSize:12.5,marginTop:1,fontFamily:F}}>{f.time}</div>
+              </div>
+              {hov===i&&<button style={{padding:'4px 13px',borderRadius:7,background:'rgba(255,255,255,.1)',border:'1px solid rgba(255,255,255,.14)',color:'rgba(255,255,255,.65)',fontSize:13,cursor:'pointer',fontFamily:F,flexShrink:0}}>Run</button>}
+            </div>
+          ))}
+          <div style={{marginTop:8,padding:'10px 12px',borderTop:'1px solid rgba(255,255,255,.07)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+            <div style={{display:'flex',gap:5}}>
+              {['♿','⊙','☀'].map((ic,i)=>(
+                <div key={i} style={{width:32,height:32,borderRadius:8,background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.09)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,color:'rgba(255,255,255,.38)',cursor:'pointer'}}>{ic}</div>
+              ))}
+            </div>
+            <span style={{color:'rgba(255,255,255,.35)',fontSize:14,cursor:'pointer',fontFamily:F}}>Quit</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── S2 Step 2: Animated Pill (Recording → Translating) ── */
+function AnimatedPill() {
+  const [phase, setPhase] = useState(0);
+  const [vis, setVis]   = useState(true);
+
+  useEffect(() => {
+    let t1,t2,t3,t4;
+    const cycle = () => {
+      setPhase(0); setVis(true);
+      t1 = setTimeout(()=>setVis(false), 3400);
+      t2 = setTimeout(()=>{ setPhase(1); setVis(true); }, 3800);
+      t3 = setTimeout(()=>setVis(false), 7200);
+      t4 = setTimeout(()=>cycle(), 7700);
+    };
+    cycle();
+    return ()=>[t1,t2,t3,t4].forEach(clearTimeout);
+  }, []);
+
+  const pill = {
+    display:'inline-flex', alignItems:'center',
+    background:'rgba(10,10,14,0.98)',
+    borderRadius:100,
+    border:'1px solid rgba(255,255,255,.11)',
+    boxShadow:'0 16px 48px rgba(0,0,0,.7)',
+  };
+
+  return (
+    <div style={{width:'100%',height:'100%',background:'radial-gradient(ellipse at 28% 28%,rgba(12,16,48,0.72) 0%,transparent 50%),linear-gradient(145deg,#0c0c14,#0e0e16)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+      <div style={{opacity:vis?1:0, transform:`scale(${vis?1:.96})`, transition:'opacity .36s ease, transform .36s ease'}}>
+        {phase === 0 ? (
+          <div style={{...pill, padding:'7px'}}>
+            <div style={{width:42,height:42,borderRadius:'50%',background:'rgba(255,255,255,.09)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:17,color:'rgba(255,255,255,.5)',cursor:'pointer',flexShrink:0}}>✕</div>
+            <div style={{padding:'0 22px',display:'flex',flexDirection:'column',alignItems:'center',gap:7}}>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <div style={{width:8,height:8,borderRadius:'50%',background:'#FF453A',animation:'recBlink 1.6s ease-in-out infinite'}}/>
+                <span style={{color:'#fff',fontSize:14,fontWeight:500,fontFamily:F,whiteSpace:'nowrap'}}>Built-in Retina Display  1512×982</span>
+              </div>
+              <div style={{display:'flex',gap:5}}>
+                {[0,1,2,3,4,5,6].map(i=>(
+                  <div key={i} style={{width:5,height:5,borderRadius:'50%',background:'rgba(255,255,255,.6)',animation:`dotWave 1.5s ease-in-out ${i*.12}s infinite`}}/>
+                ))}
+              </div>
+            </div>
+            <div style={{width:42,height:42,borderRadius:'50%',background:'#28C840',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,color:'#fff',cursor:'pointer',fontWeight:600,flexShrink:0,boxShadow:'0 0 16px rgba(40,200,64,.45)'}}>✓</div>
+          </div>
+        ) : (
+          <div style={{...pill, padding:'16px 28px', gap:14}}>
+            <div style={{width:22,height:22,borderRadius:'50%',border:'2.5px solid rgba(255,255,255,.17)',borderTopColor:'rgba(255,255,255,.62)',animation:'spinRing .8s linear infinite',flexShrink:0}}/>
+            <span style={{color:'#fff',fontSize:16,fontWeight:500,fontFamily:F,whiteSpace:'nowrap'}}>Translating visual intent</span>
+            <span style={{color:'rgba(255,255,255,.32)',fontSize:16,letterSpacing:'.06em'}}>···</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── S2 Step 3: Agent PiP ── */
+function AgentPiP() {
+  const [step, setStep] = useState(2);
+  const [logs, setLogs] = useState(['Step 1/5: Navigated to crm.internal.com','Step 2/5: Clicked Search Bar','Typing: CRM-84721…']);
+
+  useEffect(() => {
+    const q=['Step 3/5: Form submitted','Step 4/5: Extracting rows','47 rows captured','Step 5/5: output.csv written','All steps complete ✓'];
+    let i=0;
+    const ti = setInterval(()=>{
+      if(i<q.length){setLogs(l=>[...l.slice(-3),q[i]]);if(i<2)setStep(s=>Math.min(s+1,5));i++;}
+    },2400);
+    return ()=>clearInterval(ti);
+  },[]);
+
+  return (
+    <div style={{width:'100%',height:'100%',background:'radial-gradient(ellipse at 28% 28%,rgba(12,16,48,0.72) 0%,transparent 50%),linear-gradient(145deg,#0c0c14,#0e0e16)',position:'relative',overflow:'hidden'}}>
+      {[{t:'4%',l:'2%',w:'54%',h:'50%'},{t:'10%',l:'59%',w:'33%',h:'36%'},{t:'63%',l:'2%',w:'36%',h:'27%'}].map((p,i)=>(
+        <div key={i} style={{position:'absolute',top:p.t,left:p.l,width:p.w,height:p.h,borderRadius:8,background:'rgba(255,255,255,.012)',border:'1px solid rgba(255,255,255,.028)'}}>
+          <div style={{height:16,display:'flex',alignItems:'center',padding:'0 6px',gap:2.5,borderBottom:'1px solid rgba(255,255,255,.02)'}}>
+            {['#FF5F57','#FFBD2E','#28C840'].map((c,j)=>(<div key={j} style={{width:5.5,height:5.5,borderRadius:'50%',background:c,opacity:.35}}/>))}
+          </div>
+        </div>
+      ))}
+      {/* PiP */}
+      <div style={{position:'absolute',bottom:12,right:12,width:290,height:164,borderRadius:10,overflow:'hidden',border:'1px solid rgba(255,255,255,.09)',boxShadow:'0 16px 48px rgba(0,0,0,.8)'}}>
+        <div style={{width:'100%',height:'100%',background:'#ededdf',position:'relative',overflow:'hidden'}}>
+          <div style={{height:16,background:'#e3e0d6',borderBottom:'1px solid #c8c4b8',display:'flex',alignItems:'center',padding:'0 6px',gap:2.5}}>
+            {['#FF5F57','#FFBD2E','#28C840'].map((c,i)=>(<div key={i} style={{width:5.5,height:5.5,borderRadius:'50%',background:c,opacity:.72}}/>))}
+            <div style={{flex:1,height:9,borderRadius:2,background:'white',border:'1px solid #ccc',display:'flex',alignItems:'center',padding:'0 5px',marginLeft:4}}>
+              <span style={{color:'#666',fontSize:6.5,fontFamily:M}}>crm.internal.com</span>
+            </div>
+          </div>
+          <div style={{padding:'5px 8px',fontFamily:M,fontSize:7.5,color:'#2a2a2a'}}>
+            <div style={{fontWeight:700,marginBottom:3,borderBottom:'1px solid #999',paddingBottom:2}}>ENTERPRISE CRM v4.2</div>
+            {[['Customer ID','CRM-84721',false],['Account Name','Acme Corp▋',true]].map(([f,v,hi],i)=>(
+              <div key={i} style={{display:'flex',gap:5,marginBottom:2,alignItems:'center'}}>
+                <span style={{color:'#888',width:58,flexShrink:0}}>{f}:</span>
+                <span style={{background:hi?'#fffce5':'transparent',fontWeight:hi?700:'normal'}}>{v}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{position:'absolute',top:16,left:0,right:0,bottom:0,pointerEvents:'none'}}>
+            <div style={{position:'absolute',fontSize:8,animation:'cursorDrift 5.5s ease-in-out infinite',filter:'drop-shadow(0 1px 2px rgba(0,0,0,.5))'}}>↖</div>
+          </div>
+          <div style={{position:'absolute',top:22,left:5,display:'flex',alignItems:'center',gap:3,background:'rgba(8,8,16,0.9)',border:'1px solid rgba(50,215,75,.2)',borderRadius:100,padding:'2px 6px'}}>
+            <div style={{width:4,height:4,borderRadius:'50%',background:'#32D74B',animation:'recBlink 1.7s infinite'}}/>
+            <span style={{color:'#32D74B',fontSize:7.5,fontWeight:500,fontFamily:F}}>Agent Active</span>
+          </div>
+          <div style={{position:'absolute',top:22,right:5,background:'rgba(8,8,16,0.9)',border:'1px solid rgba(255,255,255,.08)',borderRadius:4,padding:'2px 6px'}}>
+            <span style={{color:'rgba(255,255,255,.38)',fontSize:7.5,fontFamily:M}}>Step <span style={{color:'rgba(255,255,255,.9)',fontWeight:600}}>{step}</span>/5</span>
+          </div>
+          <div style={{position:'absolute',bottom:5,left:6,right:6}}>
+            {logs.slice(-2).map((l,i,a)=>(
+              <div key={i} style={{color:i===a.length-1?'rgba(255,255,255,.7)':'rgba(255,255,255,.22)',fontSize:6.5,fontFamily:M,textShadow:'0 1px 3px rgba(0,0,0,.9)',lineHeight:1.45}}>› {l}</div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── RENDER ── */
+ReactDOM.createRoot(document.getElementById('s1-demo')).render(<S1MenuBar/>);
+ReactDOM.createRoot(document.getElementById('s2-record')).render(<S1MenuBar/>);
+ReactDOM.createRoot(document.getElementById('s2-compile')).render(<AnimatedPill/>);
+ReactDOM.createRoot(document.getElementById('s2-deploy')).render(<AgentPiP/>);
+</script>
+</body>
+</html>

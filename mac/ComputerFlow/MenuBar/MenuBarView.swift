@@ -256,20 +256,33 @@ struct RecentWorkflowRow: View {
             Spacer()
 
             if isHovered {
-                Button("Run") {
-                    appState.startRun(workflowId: workflow.id)
+                HStack(spacing: 6) {
+                    Button("Run") {
+                        appState.startRun(workflowId: workflow.id)
+                    }
+                    .font(.system(size: 11.5))
+                    .foregroundColor(Theme.t2)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 3)
+                    .background(Theme.ctrl)
+                    .cornerRadius(6)
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.bdiv, lineWidth: 1))
+                    .buttonStyle(PlainButtonStyle())
+
+                    Button(action: {
+                        WorkflowStore.shared.remove(id: workflow.id)
+                    }) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 11))
+                            .foregroundColor(Theme.red)
+                            .frame(width: 22, height: 22)
+                            .background(Theme.ctrl)
+                            .cornerRadius(6)
+                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.bdiv, lineWidth: 1))
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .help("Delete workflow")
                 }
-                .font(.system(size: 11.5))
-                .foregroundColor(Theme.t2)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 3)
-                .background(Theme.ctrl)
-                .cornerRadius(6)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Theme.bdiv, lineWidth: 1)
-                )
-                .buttonStyle(PlainButtonStyle())
             }
         }
         .padding(.horizontal, 8)

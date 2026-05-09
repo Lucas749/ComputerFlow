@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ComputerFlow — Automate Anything on Your Mac</title>
+<link rel="icon" type="image/png" href="uploads/pasted-1778362911069-0.png">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',Helvetica,sans-serif;background:#fff;color:#1d1d1f;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+
+@keyframes dotWave{0%,100%{opacity:.22;transform:scale(.74)}50%{opacity:.88;transform:scale(1)}}
+@keyframes recBlink{0%,100%{opacity:1}50%{opacity:.2}}
+@keyframes spinRing{to{transform:rotate(360deg)}}
+@keyframes cursorDrift{0%{transform:translate(60px,46px)}18%{transform:translate(170px,80px)}36%{transform:translate(120px,150px)}54%{transform:translate(244px,100px)}72%{transform:translate(86px,190px)}100%{transform:translate(60px,46px)}}
+
+/* POWERED BY TOP BAR */
+.powered-top{position:fixed;top:0;left:0;right:0;z-index:210;height:44px;background:#0a0a0c;display:flex;align-items:center;justify-content:center;gap:40px;border-bottom:1px solid rgba(255,255,255,.06)}
+.powered-top .lbl{font-size:11px;font-weight:500;letter-spacing:.09em;text-transform:uppercase;color:rgba(255,255,255,.22)}
+.powered-top .sep{width:1px;height:20px;background:rgba(255,255,255,.1)}
+.powered-top .item{display:flex;align-items:center;gap:8px}
+.powered-top img.kernel{height:19px;filter:invert(1);opacity:.42}
+.powered-top img.lc{height:17px;opacity:.5}
+.powered-top .northstar{font-size:13px;color:rgba(255,255,255,.32);font-weight:500;font-family:-apple-system,sans-serif}
+
+/* NAV */
+.nav{position:fixed;top:44px;left:0;right:0;z-index:200;height:48px;background:rgba(255,255,255,0.88);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-bottom:1px solid rgba(0,0,0,0.07);display:flex;align-items:center;justify-content:space-between;padding:0 52px}
+.nav-logo{font-size:16px;font-weight:600;letter-spacing:-.022em;color:#1d1d1f;display:flex;align-items:center;gap:9px}
+.nav-logo img{width:26px;height:26px;border-radius:6px}
+.nav-cta{background:#1d1d1f;color:#fff;border:none;border-radius:100px;padding:7px 18px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;text-decoration:none;transition:background .15s}
+.nav-cta:hover{background:#3a3a3a}
+
+/* HERO */
+.hero{min-height:100vh;padding:184px 52px 80px;display:flex;flex-direction:column;align-items:center;text-align:center;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-180px;left:50%;transform:translateX(-50%);width:860px;height:660px;border-radius:50%;background:radial-gradient(ellipse,rgba(0,0,0,0.025) 0%,transparent 70%);pointer-events:none}
+.hero-eye{font-size:13.5px;font-weight:500;color:#6e6e73;letter-spacing:.01em;margin-bottom:18px}
+.hero h1{font-size:clamp(54px,8.5vw,100px);font-weight:700;letter-spacing:-.042em;line-height:1.02;color:#1d1d1f;margin-bottom:24px;max-width:820px;text-wrap:pretty}
+.hero-sub{font-size:clamp(18px,2.2vw,22px);color:#6e6e73;max-width:500px;line-height:1.55;margin-bottom:40px;text-wrap:pretty}
+.hero-ctas{display:flex;gap:14px;justify-content:center;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+.btn-p{background:#1d1d1f;color:#fff;border:none;border-radius:100px;padding:14px 30px;font-size:17px;font-weight:500;cursor:pointer;font-family:inherit;text-decoration:none;display:inline-block;transition:background .15s}
+.btn-p:hover{background:#3a3a3a}
+.btn-l{font-size:17px;color:#6e6e73;text-decoration:none;display:flex;align-items:center;gap:3px;transition:color .15s}
+.btn-l:hover{color:#1d1d1f}
+.hero-pill-wrap{width:100%;max-width:720px;height:200px;position:relative}
+
+/* DIVIDER */
+.rule{height:1px;background:rgba(0,0,0,0.06);max-width:1240px;margin:0 auto}
+
+/* FEATURES */
+.feats{max-width:1240px;margin:0 auto}
+.feat{display:flex;align-items:center;gap:80px;padding:120px 52px}
+.feat.rev{flex-direction:row-reverse}
+.feat-copy{flex:1;min-width:0}
+.feat-vis{flex:1.3;min-width:0}
+.feat-eye{font-size:12px;font-weight:500;color:#aeaeb2;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px}
+.feat h2{font-size:clamp(36px,4.2vw,54px);font-weight:600;letter-spacing:-.032em;line-height:1.06;color:#1d1d1f;margin-bottom:18px;text-wrap:pretty}
+.feat p{font-size:19px;color:#6e6e73;line-height:1.6}
+.feat-win{border-radius:13px;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,0.06),0 20px 56px rgba(0,0,0,0.10),0 0 0 0.5px rgba(0,0,0,0.06)}
+
+/* DARK SECTION */
+.dark-sec{background:#0a0a0c;padding:120px 52px;text-align:center}
+.dark-sec .eye{font-size:12px;font-weight:500;color:rgba(255,255,255,0.3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px}
+.dark-sec h2{font-size:clamp(40px,5.5vw,68px);font-weight:600;letter-spacing:-.038em;line-height:1.04;color:#f5f5f7;margin-bottom:16px}
+.dark-sec .sub{font-size:21px;color:rgba(255,255,255,0.4);margin-bottom:60px;max-width:520px;margin-left:auto;margin-right:auto}
+.dark-win{max-width:960px;margin:0 auto;border-radius:13px;overflow:hidden;box-shadow:0 0 0 0.5px rgba(255,255,255,0.06),0 32px 96px rgba(0,0,0,0.7)}
+
+/* CTA */
+.cta-sec{background:#f5f5f7;padding:120px 52px;text-align:center}
+.cta-sec h2{font-size:clamp(40px,6vw,72px);font-weight:700;letter-spacing:-.042em;line-height:1.03;color:#1d1d1f;margin-bottom:20px}
+.cta-sec .sub{font-size:19px;color:#6e6e73;margin-bottom:36px}
+.cta-note{font-size:13px;color:#aeaeb2;margin-top:16px}
+
+/* FOOTER */
+footer{padding:28px 52px;border-top:1px solid rgba(0,0,0,0.06);display:flex;align-items:center;justify-content:space-between}
+footer .logo{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:#6e6e73}
+footer .logo img{width:20px;height:20px;border-radius:4px}
+footer .links{display:flex;gap:24px;list-style:none}
+footer .links a{font-size:12px;color:#aeaeb2;text-decoration:none}
+
+/* REVEAL */
+.rv{opacity:0;transform:translateY(24px);transition:opacity .72s ease,transform .72s ease}
+.rv.d1{transition-delay:.08s}.rv.d2{transition-delay:.16s}
+.rv.in{opacity:1;transform:none}
+
+/* WIN BAR */
+.wbar{height:36px;display:flex;align-items:center;padding:0 14px;gap:7px;background:#ebebee;border-bottom:1px solid rgba(0,0,0,0.08)}
+.wbar.dk{background:#131315;border-bottom:1px solid rgba(255,255,255,.06)}
+.dot{width:12px;height:12px;border-radius:50%}
+
+@media(max-width:860px){
+  .powered-top{gap:20px;height:40px}
+  .powered-top .lbl{font-size:10px}
+  .nav{top:40px;padding:0 24px}
+  .hero{padding:160px 24px 64px}
+  .feat{flex-direction:column!important;gap:48px;padding:80px 24px}
+  .dark-sec,.cta-sec{padding:80px 24px}
+}
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+
+<!-- POWERED BY TOP BAR -->
+<div class="powered-top">
+  <span class="lbl">Powered by</span>
+  <div class="sep"></div>
+  <img src="uploads/pasted-1778363127600-0.png" class="kernel" alt="Kernel">
+  <div class="sep"></div>
+  <div class="item">
+    <img src="uploads/pasted-1778363140530-0.png" class="lc" alt="Lightcone">
+    <span class="northstar">Northstar by Lightcone</span>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-logo">
+    <img src="uploads/pasted-1778362911069-0.png" alt="ComputerFlow">
+    ComputerFlow
+  </div>
+  <a href="https://github.com/Lucas749/ComputerFlow" target="_blank" class="nav-cta">Download</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-eye rv in">For Mac</div>
+  <h1 class="rv in d1">Turn any task<br>into an agent.</h1>
+  <p class="hero-sub rv in d2">Record on your Mac. Hand it off to the cloud. An AI agent runs your task — autonomously, forever.</p>
+  <div class="hero-ctas rv in d2">
+    <a href="https://github.com/Lucas749/ComputerFlow" target="_blank" class="btn-p">Download for Mac</a>
+  </div>
+  <div class="hero-pill-wrap rv in d2">
+    <div id="demo-hero" style="height:200px"></div>
+  </div>
+</section>
+
+<div class="rule"></div>
+
+<!-- RECORD -->
+<div class="feats">
+  <div class="feat">
+    <div class="feat-copy rv">
+      <div class="feat-eye">Record</div>
+      <h2>Starts from your menu bar.</h2>
+      <p>Hit <span style="font-family:'SF Mono','Menlo',monospace;font-size:14px;background:#f5f5f7;border:1px solid rgba(0,0,0,.1);border-radius:5px;padding:1px 7px">⌘OR</span> and do your task normally. ComputerFlow watches from the menu bar, invisibly capturing every click and keystroke.</p>
+    </div>
+    <div class="feat-vis rv d1">
+      <div class="feat-win">
+        <div id="demo-record" style="height:430px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="rule"></div>
+
+<!-- REVIEW -->
+<div class="feats">
+  <div class="feat rev">
+    <div class="feat-copy rv d1">
+      <div class="feat-eye">Review</div>
+      <h2>Every step, editable.</h2>
+      <p>The AI extracts each action into a reviewable list — with a screenshot per step. Adjust targets, mark variables, and approve before it ships.</p>
+    </div>
+    <div class="feat-vis rv">
+      <div class="feat-win">
+        <div class="wbar">
+          <div class="dot" style="background:#FF5F57"></div>
+          <div class="dot" style="background:#FFBD2E"></div>
+          <div class="dot" style="background:#28C840"></div>
+        </div>
+        <div id="demo-review" style="height:480px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DEPLOY -->
+<section class="dark-sec">
+  <div class="rv">
+    <div class="eye">Deploy</div>
+    <h2>Record locally.<br>Run in the cloud.</h2>
+    <p class="sub">Once deployed, agents execute headlessly via Kernel or via Computer Use by Lightcone — with a live Picture-in-Picture feed you can pause or take over any time.</p>
+  </div>
+  <div class="dark-win rv d1">
+    <div class="wbar dk">
+      <div class="dot" style="background:#FF5F57"></div>
+      <div class="dot" style="background:#FFBD2E"></div>
+      <div class="dot" style="background:#28C840"></div>
+    </div>
+    <div id="demo-deploy" style="height:400px"></div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-sec">
+  <div class="rv">
+    <h2>Ready to automate?</h2>
+    <p class="sub">Free during public beta. Mac only.</p>
+    <a href="https://github.com/Lucas749/ComputerFlow" target="_blank" class="btn-p">Download on GitHub</a>
+    <p class="cta-note">macOS 14 Sonoma or later · Apple Silicon &amp; Intel</p>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="logo">
+    <img src="uploads/pasted-1778362911069-0.png" alt="">
+    ComputerFlow
+  </div>
+  <ul class="links">
+    <li><a href="https://github.com/Lucas749/ComputerFlow" target="_blank">GitHub</a></li>
+  </ul>
+</footer>
+
+<!-- REACT DEMOS -->
+<script type="text/babel">
+const {useState, useEffect} = React;
+const F = "-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif";
+const M = "'SF Mono','Menlo','Fira Code',monospace";
+
+function PillHero() {
+  const [phase, setPhase] = useState(0);
+  const [vis, setVis] = useState(true);
+
+  useEffect(() => {
+    let t1, t2, t3, t4;
+    const cycle = () => {
+      setPhase(0); setVis(true);
+      t1 = setTimeout(() => setVis(false), 3600);
+      t2 = setTimeout(() => { setPhase(1); setVis(true); }, 4000);
+      t3 = setTimeout(() => setVis(false), 7600);
+      t4 = setTimeout(() => cycle(), 8100);
+    };
+    cycle();
+    return () => [t1,t2,t3,t4].forEach(clearTimeout);
+  }, []);
+
+  const pillStyle = {
+    display:'inline-flex', alignItems:'center',
+    background:'rgba(10,10,12,0.97)',
+    borderRadius:100,
+    border:'1px solid rgba(255,255,255,0.11)',
+    boxShadow:'0 20px 60px rgba(0,0,0,.18), 0 4px 16px rgba(0,0,0,.1)',
+  };
+
+  return (
+    <div style={{width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center'}}>
+      <div style={{opacity:vis?1:0, transform:`scale(${vis?1:.97})`, transition:'opacity .38s ease, transform .38s ease'}}>
+        {phase === 0 ? (
+          <div style={{...pillStyle, padding:'7px'}}>
+            <div style={{width:46,height:46,borderRadius:'50%',background:'rgba(255,255,255,.09)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:17,color:'rgba(255,255,255,.55)',cursor:'pointer',flexShrink:0}}>✕</div>
+            <div style={{padding:'0 26px',display:'flex',flexDirection:'column',alignItems:'center',gap:7}}>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <div style={{width:8,height:8,borderRadius:'50%',background:'#FF453A',animation:'recBlink 1.6s ease-in-out infinite'}}/>
+                <span style={{color:'#fff',fontSize:15,fontWeight:500,fontFamily:F,letterSpacing:'-.01em',whiteSpace:'nowrap'}}>Built-in Retina Display  1512×982</span>
+              </div>
+              <div style={{display:'flex',gap:5.5}}>
+                {[0,1,2,3,4,5,6].map(i=>(
+                  <div key={i} style={{width:5.5,height:5.5,borderRadius:'50%',background:'rgba(255,255,255,.58)',animation:`dotWave 1.5s ease-in-out ${i*.12}s infinite`}}/>
+                ))}
+              </div>
+            </div>
+            <div style={{width:46,height:46,borderRadius:'50%',background:'#28C840',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,color:'#fff',cursor:'pointer',fontWeight:600,flexShrink:0,boxShadow:'0 0 18px rgba(40,200,64,.45)'}}>✓</div>
+          </div>
+        ) : (
+          <div style={{...pillStyle, padding:'16px 30px', gap:14}}>
+            <div style={{width:24,height:24,borderRadius:'50%',border:'2.5px solid rgba(255,255,255,.18)',borderTopColor:'rgba(255,255,255,.6)',animation:'spinRing .8s linear infinite',flexShrink:0}}/>
+            <span style={{color:'#fff',fontSize:17,fontWeight:500,fontFamily:F,whiteSpace:'nowrap'}}>Translating visual intent</span>
+            <span style={{color:'rgba(255,255,255,.35)',fontSize:17,letterSpacing:'.08em'}}>···</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MenuBarLight() {
+  const [hov, setHov] = useState(null);
+  const flows = [
+    {name:'Google Search Trending Topic', time:'0m ago'},
+    {name:'Zoom In Paste Chrome', time:'1m ago'},
+    {name:'Open New Tab Search', time:'24m ago'},
+  ];
+
+  return (
+    <div style={{width:'100%',height:'100%',background:'linear-gradient(145deg,#d4dfe8 0%,#c8d5e2 100%)',display:'flex',alignItems:'flex-start',justifyContent:'flex-end',position:'relative',overflow:'hidden'}}>
+      <div style={{position:'absolute',top:0,left:0,right:0,height:26,background:'rgba(220,228,236,0.92)',backdropFilter:'blur(20px)',borderBottom:'1px solid rgba(0,0,0,0.08)',display:'flex',alignItems:'center',justifyContent:'flex-end',paddingRight:10,gap:12}}>
+        <span style={{color:'rgba(0,0,0,.45)',fontSize:11.5,fontFamily:F}}>May 9  10:42</span>
+        <img src="uploads/pasted-1778362911069-0.png" style={{width:15,height:15,borderRadius:3.5,opacity:.7}} alt=""/>
+      </div>
+
+      <div style={{marginTop:28,marginRight:14,display:'flex',flexDirection:'column',alignItems:'flex-end'}}>
+        <div style={{marginRight:6,marginBottom:-1,zIndex:5,width:0,height:0,borderLeft:'7px solid transparent',borderRight:'7px solid transparent',borderBottom:'8px solid #f5f5f5'}}/>
+
+        <div style={{width:296,background:'#f5f5f5',borderRadius:14,overflow:'hidden',boxShadow:'0 4px 24px rgba(0,0,0,.18),0 0 0 0.5px rgba(0,0,0,.1)'}}>
+
+          <div style={{padding:'14px 16px 8px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <span style={{color:'#1d1d1f',fontSize:17,fontWeight:700,fontFamily:F}}>ComputerFlow</span>
+            <div style={{display:'flex',alignItems:'center',gap:5}}>
+              <div style={{width:7,height:7,borderRadius:'50%',background:'#34C759',boxShadow:'0 0 6px rgba(52,199,89,.5)'}}/>
+              <span style={{color:'#34C759',fontSize:13,fontWeight:500,fontFamily:F}}>Ready</span>
+            </div>
+          </div>
+
+          <div style={{padding:'0 11px 10px'}}>
+            <div style={{height:46,background:'#e8e8ea',borderRadius:10,display:'flex',alignItems:'center',padding:'0 13px',gap:10,cursor:'pointer',border:'1px solid rgba(0,0,0,.07)'}}>
+              <div style={{width:9,height:9,borderRadius:'50%',background:'#FF3B30',animation:'recBlink 2s ease-in-out infinite',flexShrink:0}}/>
+              <span style={{color:'#1d1d1f',fontSize:16,fontWeight:600,flex:1,fontFamily:F}}>Start Recording</span>
+              <span style={{color:'rgba(0,0,0,.4)',fontSize:11,fontFamily:M,background:'rgba(0,0,0,.07)',border:'1px solid rgba(0,0,0,.09)',borderRadius:5,padding:'2px 7px',whiteSpace:'nowrap'}}>⌘OR</span>
+            </div>
+          </div>
+
+          <div style={{padding:'2px 13px 9px',display:'flex',alignItems:'center',gap:7}}>
+            <span style={{color:'rgba(0,0,0,.35)',fontSize:12.5,fontFamily:F}}>🖥</span>
+            <div style={{display:'flex',alignItems:'center',gap:4}}>
+              <div style={{width:18,height:18,borderRadius:4,background:'rgba(0,0,0,.07)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,color:'rgba(0,0,0,.4)',cursor:'pointer'}}>‹</div>
+              <span style={{color:'rgba(0,0,0,.5)',fontSize:12.5,fontFamily:F}}>Display 1  1512×982</span>
+              <div style={{width:18,height:18,borderRadius:4,background:'rgba(0,0,0,.07)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,color:'rgba(0,0,0,.4)',cursor:'pointer'}}>›</div>
+            </div>
+          </div>
+
+          <div style={{padding:'4px 14px 5px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <span style={{color:'rgba(0,0,0,.4)',fontSize:13,fontFamily:F}}>Recent</span>
+            <span style={{color:'rgba(0,0,0,.35)',fontSize:13,fontFamily:F}}>All &gt;</span>
+          </div>
+
+          {flows.map((f, i) => (
+            <div key={i} onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)}
+              style={{display:'flex',alignItems:'center',gap:10,padding:'8px 11px',cursor:'pointer',background:hov===i?'rgba(0,0,0,.04)':'transparent',transition:'background .1s'}}>
+              <div style={{width:32,height:32,borderRadius:8,background:'rgba(0,0,0,.06)',border:'1px solid rgba(0,0,0,.08)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,color:'rgba(0,0,0,.4)',flexShrink:0}}>→</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{color:'#1d1d1f',fontSize:14,fontWeight:500,fontFamily:F,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.name}</div>
+                <div style={{color:'rgba(0,0,0,.35)',fontSize:12,marginTop:1,fontFamily:F}}>{f.time}</div>
+              </div>
+              {hov===i && <button style={{padding:'4px 12px',borderRadius:6,background:'rgba(0,0,0,.06)',border:'1px solid rgba(0,0,0,.1)',color:'rgba(0,0,0,.6)',fontSize:12,cursor:'pointer',fontFamily:F,flexShrink:0}}>Run</button>}
+            </div>
+          ))}
+
+          <div style={{marginTop:6,padding:'9px 11px',borderTop:'1px solid rgba(0,0,0,.07)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+            <div style={{display:'flex',gap:5}}>
+              {['♿','⊙','☾'].map((ic,i)=>(
+                <div key={i} style={{width:30,height:30,borderRadius:7,background:'rgba(0,0,0,.06)',border:'1px solid rgba(0,0,0,.08)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,color:'rgba(0,0,0,.45)',cursor:'pointer'}}>{ic}</div>
+              ))}
+            </div>
+            <span style={{color:'rgba(0,0,0,.4)',fontSize:13,cursor:'pointer',fontFamily:F}}>Quit</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReviewWindow() {
+  const [sel, setSel] = useState(3);
+  const steps = [
+    {type:'Click',   desc:'Click Google sear...', status:'idle'},
+    {type:'Type',    desc:'Type search quer...', status:'idle'},
+    {type:'Hotkey',  desc:'Clear or dismiss t...', status:'warn'},
+    {type:'Click',   desc:"Click the 'super d...", status:'idle'},
+  ];
+  const labels = ['Click','Type','Hotkey','Click'];
+
+  return (
+    <div style={{width:'100%',height:'100%',display:'flex',flexDirection:'column',background:'#f0f0f2'}}>
+      <div style={{flex:1,display:'flex',overflow:'hidden'}}>
+
+        <div style={{width:200,background:'#f0f0f2',borderRight:'1px solid rgba(0,0,0,.08)',padding:'14px 8px',display:'flex',flexDirection:'column',gap:3,overflowY:'auto'}}>
+          <div style={{fontSize:11,fontWeight:600,color:'#aeaeb2',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:6,paddingLeft:6,fontFamily:F}}>Steps</div>
+          {steps.map((s,i)=>(
+            <div key={i} onClick={()=>setSel(i)}
+              style={{display:'flex',alignItems:'center',gap:9,padding:'7px 8px',borderRadius:10,cursor:'pointer',background:sel===i?'#fff':'transparent',boxShadow:sel===i?'0 1px 5px rgba(0,0,0,.1)':'none',transition:'all .12s'}}>
+              <div style={{width:46,height:32,borderRadius:5,background:'#252527',flexShrink:0,overflow:'hidden',border:'1px solid rgba(0,0,0,.18)'}}>
+                <div style={{height:8,background:'#1a1a1c',display:'flex',alignItems:'center',padding:'0 3px',gap:1.5}}>
+                  {['#FF5F57','#FFBD2E','#28C840'].map((c,j)=>(<div key={j} style={{width:2.5,height:2.5,borderRadius:'50%',background:c}}/>))}
+                </div>
+                <div style={{padding:'3px 3px',display:'flex',flexDirection:'column',gap:2}}>
+                  {[88,66,76].map((w,j)=>(<div key={j} style={{height:3,borderRadius:1,background:'rgba(255,255,255,.1)',width:`${w}%`}}/>))}
+                </div>
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:600,color:'#1d1d1f',fontFamily:F}}>{s.type}</div>
+                <div style={{fontSize:11,color:'#aeaeb2',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontFamily:F}}>{s.desc}</div>
+              </div>
+              <div style={{width:7,height:7,borderRadius:'50%',flexShrink:0,background:s.status==='warn'?'#FF9500':'rgba(0,0,0,.12)'}}/>
+            </div>
+          ))}
+          <div style={{marginTop:6,border:'1.5px dashed rgba(0,0,0,.13)',borderRadius:10,padding:'8px',display:'flex',alignItems:'center',justifyContent:'center',gap:5,cursor:'pointer'}}>
+            <span style={{color:'#c8c8cc',fontSize:15}}>+</span>
+            <span style={{color:'#c8c8cc',fontSize:12.5,fontFamily:F}}>Add step</span>
+          </div>
+        </div>
+
+        <div style={{flex:1,padding:'20px 22px',background:'#f8f8fa',display:'flex',flexDirection:'column',gap:14,overflow:'hidden'}}>
+          <div style={{display:'flex',alignItems:'center',gap:12,flexShrink:0}}>
+            <div style={{width:34,height:34,borderRadius:'50%',border:'2px solid rgba(0,0,0,.18)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,fontWeight:700,color:'#555',flexShrink:0}}>{sel+1}</div>
+            <span style={{fontSize:24,fontWeight:700,color:'#1d1d1f',fontFamily:F}}>{labels[sel]}</span>
+            <span style={{fontSize:12.5,fontWeight:600,color:'#007AFF',background:'rgba(0,122,255,.1)',border:'1px solid rgba(0,122,255,.2)',borderRadius:6,padding:'3px 10px',flexShrink:0}}>Browser</span>
+          </div>
+          <p style={{fontSize:13.5,color:'#6e6e73',marginLeft:46,flexShrink:0,fontFamily:F,lineHeight:1.5}}>Click the 'super duty carhartt truck' trending search suggestion</p>
+
+          <div style={{flex:1,background:'#1e1e2c',borderRadius:10,border:'1px solid rgba(0,0,0,.12)',overflow:'hidden',minHeight:120}}>
+            <div style={{height:22,background:'#141420',display:'flex',alignItems:'center',padding:'0 10px',gap:5}}>
+              {['#FF5F57','#FFBD2E','#28C840'].map((c,i)=>(<div key={i} style={{width:8,height:8,borderRadius:'50%',background:c}}/>))}
+              <div style={{flex:1,height:12,background:'rgba(255,255,255,.05)',borderRadius:3,marginLeft:6,display:'flex',alignItems:'center',padding:'0 7px'}}>
+                <span style={{color:'rgba(255,255,255,.28)',fontSize:8.5,fontFamily:M}}>google.com</span>
+              </div>
+            </div>
+            <div style={{padding:'12px 14px'}}>
+              <div style={{textAlign:'center',color:'#fff',fontSize:18,fontWeight:700,marginBottom:10,letterSpacing:'-.02em',opacity:.82}}>Google</div>
+              {['super duty carhartt truck','el niño forecast','seo softball tournament bracket'].map((t,i)=>(
+                <div key={i} style={{display:'flex',alignItems:'center',gap:7,padding:'3px 0'}}>
+                  <span style={{color:'rgba(255,255,255,.2)',fontSize:9}}>↗</span>
+                  <div style={{height:6,borderRadius:2,background:i===0?'rgba(255,255,255,.32)':'rgba(255,255,255,.09)',width:`${72-i*14}%`}}/>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{display:'flex',flexDirection:'column',gap:6,flexShrink:0}}>
+            {[['Intent',"Click the 'super duty carhartt truck' trending search suggestion"],['Action','Click'],['Target',"'super duty carhartt truck' in Google search autocomplete"]].map(([lbl,val],i)=>(
+              <div key={i} style={{display:'flex',alignItems:'center',gap:10}}>
+                <span style={{width:46,fontSize:12.5,color:'#aeaeb2',textAlign:'right',flexShrink:0,fontFamily:F}}>{lbl}</span>
+                <div style={{flex:1,height:28,background:'#fff',border:'1px solid rgba(0,0,0,.09)',borderRadius:6,display:'flex',alignItems:'center',padding:'0 11px',fontSize:12.5,color:'#1d1d1f',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontFamily:F}}>{val}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={{height:48,background:'#f0f0f2',borderTop:'1px solid rgba(0,0,0,.08)',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 16px',flexShrink:0}}>
+        <button style={{background:'none',border:'none',color:'#FF3B30',fontSize:13.5,fontWeight:500,cursor:'pointer',fontFamily:F}}>Remove Step</button>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <span style={{fontSize:13,color:'#aeaeb2',fontFamily:F}}>0 of 4 approved</span>
+          <button style={{padding:'5px 14px',borderRadius:7,border:'1px solid rgba(0,0,0,.12)',background:'#fff',fontSize:13,color:'#1d1d1f',cursor:'pointer',fontFamily:F}}>Approve All</button>
+          <button style={{padding:'5px 14px',borderRadius:7,border:'none',background:'#007AFF',color:'#fff',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:F}}>⬆ Save Workflow</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AgentPiP() {
+  const [hov, setHov] = useState(false);
+  const [step, setStep] = useState(2);
+  const [logs, setLogs] = useState(['Step 1/5: Navigated to crm.internal.com','Step 2/5: Clicked Search Bar','Typing: CRM-84721…']);
+
+  useEffect(() => {
+    const q = ['Step 3/5: Form submitted','Step 4/5: Extracting rows','47 rows captured','Step 5/5: Writing output.csv','All steps complete ✓'];
+    let i = 0;
+    const ti = setInterval(() => {
+      if (i < q.length) { setLogs(l=>[...l.slice(-4),q[i]]); if(i<3) setStep(s=>Math.min(s+1,5)); i++; }
+    }, 2600);
+    return () => clearInterval(ti);
+  }, []);
+
+  return (
+    <div style={{width:'100%',height:'100%',background:'radial-gradient(ellipse at 28% 28%,rgba(12,16,48,0.72) 0%,transparent 50%),linear-gradient(145deg,#0c0c14,#0e0e16)',position:'relative',overflow:'hidden'}}>
+      {[{t:'5%',l:'3%',w:'52%',h:'50%'},{t:'12%',l:'58%',w:'34%',h:'36%'},{t:'62%',l:'3%',w:'37%',h:'27%'}].map((p,i)=>(
+        <div key={i} style={{position:'absolute',top:p.t,left:p.l,width:p.w,height:p.h,borderRadius:9,background:'rgba(255,255,255,.013)',border:'1px solid rgba(255,255,255,.03)'}}>
+          <div style={{height:18,display:'flex',alignItems:'center',padding:'0 7px',gap:3,borderBottom:'1px solid rgba(255,255,255,.02)'}}>
+            {['#FF5F57','#FFBD2E','#28C840'].map((c,j)=>(<div key={j} style={{width:6,height:6,borderRadius:'50%',background:c,opacity:.35}}/>))}
+          </div>
+        </div>
+      ))}
+      <div onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+        style={{position:'absolute',bottom:14,right:14,width:430,height:242,borderRadius:11,overflow:'hidden',cursor:'pointer',border:`1px solid ${hov?'rgba(255,255,255,.16)':'rgba(255,255,255,.08)'}`,boxShadow:'0 20px 64px rgba(0,0,0,.82)',transition:'border .2s'}}>
+        <div style={{width:'100%',height:'100%',background:'#ededdf',position:'relative',overflow:'hidden'}}>
+          <div style={{height:20,background:'#e3e0d6',borderBottom:'1px solid #c8c4b8',display:'flex',alignItems:'center',padding:'0 7px',gap:3}}>
+            {['#FF5F57','#FFBD2E','#28C840'].map((c,i)=>(<div key={i} style={{width:6.5,height:6.5,borderRadius:'50%',background:c,opacity:.72}}/>))}
+            <div style={{flex:1,height:11,borderRadius:3,background:'white',border:'1px solid #ccc',display:'flex',alignItems:'center',padding:'0 6px',marginLeft:4}}>
+              <span style={{color:'#666',fontSize:8,fontFamily:M}}>crm.internal.com/data-entry</span>
+            </div>
+          </div>
+          <div style={{padding:'6px 10px',fontFamily:M,fontSize:8.5,color:'#2a2a2a'}}>
+            <div style={{fontWeight:700,borderBottom:'1px solid #999',paddingBottom:2,marginBottom:5}}>ENTERPRISE CRM v4.2</div>
+            <table style={{borderCollapse:'collapse',width:'100%'}}>
+              <thead><tr style={{background:'#d3d0c7'}}>{['FIELD','VALUE','STATUS'].map(h=>(<th key={h} style={{border:'1px solid #bbb',padding:'2px 5px',textAlign:'left'}}>{h}</th>))}</tr></thead>
+              <tbody>{[['Customer ID','CRM-84721',false],['Account Name','Acme Corp▋',true]].map(([f,v,hi],i)=>(
+                <tr key={i} style={{background:hi?'#fffce5':'white'}}>
+                  <td style={{border:'1px solid #ccc',padding:'2px 5px'}}>{f}</td>
+                  <td style={{border:'1px solid #ccc',padding:'2px 5px'}}>{v}</td>
+                  <td style={{border:'1px solid #ccc',padding:'2px 5px',fontWeight:700,color:hi?'#92400e':'#166534'}}>{hi?'TYPING':'OK'}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+          <div style={{position:'absolute',top:20,left:0,right:0,bottom:0,pointerEvents:'none'}}>
+            <div style={{position:'absolute',fontSize:9.5,animation:'cursorDrift 5.5s ease-in-out infinite',filter:'drop-shadow(0 1px 2px rgba(0,0,0,.5))'}}>↖</div>
+          </div>
+          <div style={{position:'absolute',top:28,left:6,display:'flex',alignItems:'center',gap:4,background:'rgba(8,8,16,0.9)',border:'1px solid rgba(50,215,75,.2)',borderRadius:100,padding:'2px 8px'}}>
+            <div style={{width:5,height:5,borderRadius:'50%',background:'#32D74B',animation:'recBlink 1.7s infinite'}}/>
+            <span style={{color:'#32D74B',fontSize:9,fontWeight:500,fontFamily:F}}>Agent Active</span>
+          </div>
+          <div style={{position:'absolute',top:28,right:6,background:'rgba(8,8,16,0.9)',border:'1px solid rgba(255,255,255,.08)',borderRadius:5,padding:'2px 7px'}}>
+            <span style={{color:'rgba(255,255,255,.38)',fontSize:9,fontFamily:M}}>Step <span style={{color:'rgba(255,255,255,.9)',fontWeight:600}}>{step}</span>/5</span>
+          </div>
+          <div style={{position:'absolute',bottom:6,left:7,right:7}}>
+            {logs.slice(-3).map((l,i,a)=>(
+              <div key={i} style={{color:i===a.length-1?'rgba(255,255,255,.7)':'rgba(255,255,255,.22)',fontSize:8,fontFamily:M,lineHeight:1.5,textShadow:'0 1px 4px rgba(0,0,0,.9)'}}>› {l}</div>
+            ))}
+          </div>
+          {hov && (
+            <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',gap:8,background:'rgba(0,0,0,.45)',backdropFilter:'blur(3px)'}}>
+              {['⏸  Pause','⏹  Stop'].map(b=>(<button key={b} style={{padding:'6px 13px',borderRadius:100,cursor:'pointer',fontFamily:F,fontSize:12,background:'rgba(255,255,255,.1)',border:'1px solid rgba(255,255,255,.17)',color:'rgba(255,255,255,.82)'}}>{b}</button>))}
+              <button style={{padding:'6px 14px',borderRadius:100,cursor:'pointer',fontFamily:F,background:'rgba(255,255,255,.92)',border:'none',color:'rgba(0,0,0,.85)',fontSize:12,fontWeight:500}}>Take Control</button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('demo-hero')).render(<PillHero/>);
+ReactDOM.createRoot(document.getElementById('demo-record')).render(<MenuBarLight/>);
+ReactDOM.createRoot(document.getElementById('demo-review')).render(<ReviewWindow/>);
+ReactDOM.createRoot(document.getElementById('demo-deploy')).render(<AgentPiP/>);
+</script>
+
+<script>
+const obs = new IntersectionObserver(e=>e.forEach(x=>{ if(x.isIntersecting) x.target.classList.add('in'); }),{threshold:0.12});
+document.querySelectorAll('.rv').forEach(el=>obs.observe(el));
+</script>
+</body>
+</html>

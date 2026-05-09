@@ -150,6 +150,33 @@ async def update_workflow(
     return {"id": workflow_id, "status": "ready"}
 
 
+# ── Delete workflow ───────────────────────────────────────────────────────────
+
+@router.delete("/workflows/{workflow_id}")
+async def delete_workflow(workflow_id: str, db: Session = Depends(get_db)):
+    """Delete a workflow (DB row + on-disk files)."""
+    import shutil
+    from app.models import Workflow
+    from app.store import workflow_dir
+
+    wf = db.query(Workflow).filter(Workflow.id == workflow_id).first()
+    if wf is None:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    db.delete(wf)
+    db.commit()
+
+    # Best-effort disk cleanup
+    wdir = workflow_dir(workflow_id)
+    if wdir.exists():
+        try:
+            shutil.rmtree(wdir)
+        except Exception as e:
+            print(f"[delete_workflow] rmtree failed: {e}")
+
+    return {"id": workflow_id, "deleted": True}
+
+
 # ── Background compile pipeline ───────────────────────────────────────────────
 
 async def _run_compile(workflow_id: str, name: str) -> None:

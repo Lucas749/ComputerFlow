@@ -157,6 +157,9 @@ async def execute_workflow(
         default_target = target_map.get(router, RunTarget.AUTO)
 
         summary = (workflow.get("summary") or "").strip()
+        app_name = (workflow.get("app") or "").strip()
+        start_url = (workflow.get("startUrl") or "").strip() or None
+        alternatives = workflow.get("alternatives") or []
         goal = summary or f"Execute workflow: {workflow.get('name', '')}"
         flow = FlowRequest(
             title=workflow.get("name", "Untitled"),
@@ -164,6 +167,9 @@ async def execute_workflow(
             steps=steps,
             default_target=default_target,
             default_strategy=default_strategy,
+            start_url=start_url,
+            app=app_name,
+            alternatives=alternatives,
             context=summary,
         )
 

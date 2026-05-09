@@ -101,15 +101,12 @@ struct RecordingReviewView: View {
     }
 
     // MARK: - Title bar
+    // The window itself provides real traffic lights (titled styleMask).
+    // We just centre the editable workflow name and add an Export button.
     var titleBar: some View {
         HStack(spacing: 10) {
-            // Traffic lights spacer
-            HStack(spacing: 5) {
-                ForEach([Theme.red, Theme.amb, Theme.grn], id: \.self) { c in
-                    Circle().fill(c).frame(width: 11, height: 11)
-                }
-            }
-            .padding(.leading, 14)
+            // Left spacer matches the width of the traffic lights (~70px).
+            Spacer().frame(width: 70)
 
             Spacer()
 
@@ -122,7 +119,6 @@ struct RecordingReviewView: View {
 
             Spacer()
 
-            // Export JSON
             Button(action: exportJSON) {
                 Text("Export")
                     .font(.system(size: 12))
@@ -136,7 +132,7 @@ struct RecordingReviewView: View {
             .buttonStyle(PlainButtonStyle())
             .padding(.trailing, 14)
         }
-        .frame(height: 48)
+        .frame(height: 32)
         .background(Theme.winBg)
     }
 

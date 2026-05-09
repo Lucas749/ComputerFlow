@@ -315,6 +315,7 @@ async def _run_cua_loop(
     shots_label: str = "session",   # filename prefix
     shots_step: int = 0,            # step index for filename
     on_event: "Callable[[dict], None] | None" = None,  # optional: called per action/screenshot
+    debug_log: "Callable[[dict], None] | None" = None,  # optional: called per CUA request/response
 ) -> tuple[str, int, list[Any]]:
     """
     Core CUA protocol loop — identical for all three backends.
@@ -332,11 +333,34 @@ async def _run_cua_loop(
         "environment": environment,
     }
 
+    # Debug: log the initial prompt + response
+    if debug_log:
+        try:
+            debug_log({
+                "phase": "initial_request",
+                "model": model,
+                "environment": environment,
+                "display": [width, height],
+                "content": _redact_images(initial_content),
+            })
+        except Exception:
+            pass
+
     response = await lc_sdk.responses.create(
         model=model,
         input=[{"role": "user", "content": initial_content}],
         tools=[computer_tool],
     )
+
+    if debug_log:
+        try:
+            debug_log({
+                "phase": "initial_response",
+                "response_id": getattr(response, "id", None),
+                "output": _summarise_response_output(response),
+            })
+        except Exception:
+            pass
 
     answer = ""
     actions_taken = 0
@@ -390,6 +414,17 @@ async def _run_cua_loop(
             except Exception:
                 pass
 
+        if debug_log:
+            try:
+                debug_log({
+                    "phase": "action_executed",
+                    "action_type": action_type,
+                    "action_detail": _safe_action_dict(action),
+                    "actions_taken": actions_taken,
+                })
+            except Exception:
+                pass
+
         mime = "image/jpeg" if b64.startswith("/9j/") else "image/png"
         response = await lc_sdk.responses.create(
             model=model,
@@ -406,8 +441,79 @@ async def _run_cua_loop(
             tools=[computer_tool],
         )
 
+        if debug_log:
+            try:
+                debug_log({
+                    "phase": "loop_response",
+                    "response_id": getattr(response, "id", None),
+                    "output": _summarise_response_output(response),
+                })
+            except Exception:
+                pass
+
     answer = answer or _extract_text(response)
     return answer, actions_taken, events
+
+
+def _redact_images(content: Any) -> Any:
+    """Remove base64 image blobs from logged content — keep just a marker."""
+    if isinstance(content, list):
+        out = []
+        for item in content:
+            if isinstance(item, dict):
+                c = dict(item)
+                url = c.get("image_url")
+                if isinstance(url, str) and url.startswith("data:image/"):
+                    c["image_url"] = f"<base64 image, {len(url)} chars>"
+                elif isinstance(url, dict) and isinstance(url.get("url"), str) and url["url"].startswith("data:image/"):
+                    c["image_url"] = {"url": f"<base64 image, {len(url['url'])} chars>"}
+                out.append(c)
+            else:
+                out.append(item)
+        return out
+    return content
+
+
+def _summarise_response_output(response: Any) -> list[dict]:
+    """Flatten response output to a JSON-serialisable summary."""
+    out: list[dict] = []
+    for block in getattr(response, "output", []) or []:
+        btype = getattr(block, "type", "?")
+        if btype == "computer_call":
+            action = getattr(block, "action", None)
+            out.append({
+                "type": "computer_call",
+                "call_id": getattr(block, "call_id", None),
+                "action": _safe_action_dict(action),
+            })
+        elif btype == "text":
+            out.append({"type": "text", "text": getattr(block, "text", "")[:500]})
+        elif btype == "message":
+            content = getattr(block, "content", None)
+            if isinstance(content, str):
+                out.append({"type": "message", "text": content[:500]})
+            elif isinstance(content, list):
+                snippets = []
+                for c in content:
+                    txt = getattr(c, "text", None) or (c.get("text") if isinstance(c, dict) else None)
+                    if txt: snippets.append(str(txt)[:300])
+                out.append({"type": "message", "snippets": snippets})
+        else:
+            out.append({"type": btype})
+    return out
+
+
+def _safe_action_dict(action: Any) -> dict:
+    """Extract action fields to a plain dict."""
+    if action is None:
+        return {}
+    keys = ["type", "x", "y", "text", "keys", "button", "scroll_x", "scroll_y", "path", "url"]
+    d: dict = {}
+    for k in keys:
+        v = getattr(action, k, None)
+        if v is not None:
+            d[k] = v
+    return d
 
 
 def _extract_text(response: Any) -> str:
@@ -460,7 +566,12 @@ class ComputerFlowRunner:
 
     # ── Primary entry point ───────────────────────────────────────────────────
 
-    async def run_flow(self, flow: FlowRequest, on_event: "Callable[[dict], None] | None" = None) -> FlowResult:
+    async def run_flow(
+        self,
+        flow: FlowRequest,
+        on_event: "Callable[[dict], None] | None" = None,
+        debug_log: "Callable[[dict], None] | None" = None,
+    ) -> FlowResult:
         """
         Execute a full flow, handling target routing and handoffs automatically.
 
@@ -478,13 +589,18 @@ class ComputerFlowRunner:
         every surface used (frontend surfaces these to the user).
         """
         try:
-            return await self._execute_flow(flow, on_event=on_event)
+            return await self._execute_flow(flow, on_event=on_event, debug_log=debug_log)
         except Exception as exc:
             return FlowResult(answer="", steps_taken=0, ok=False, error=str(exc))
 
     # ── Flow execution ────────────────────────────────────────────────────────
 
-    async def _execute_flow(self, flow: FlowRequest, on_event: "Callable[[dict], None] | None" = None) -> FlowResult:
+    async def _execute_flow(
+        self,
+        flow: FlowRequest,
+        on_event: "Callable[[dict], None] | None" = None,
+        debug_log: "Callable[[dict], None] | None" = None,
+    ) -> FlowResult:
         opts = flow.options
         live_view_urls: dict[str, str] = {}
         all_events: list[Any] = []
@@ -712,6 +828,7 @@ class ComputerFlowRunner:
         environment: str,
         session_label: str = "",
         on_event: "Callable[[dict], None] | None" = None,
+        debug_log: "Callable[[dict], None] | None" = None,
     ) -> tuple[str, int, list[Any]]:
         """
         Run a group of steps via the CUA loop on a given backend.
@@ -767,7 +884,13 @@ class ComputerFlowRunner:
                 _sp.Popen(["open", shots_dir])
 
             live_b64 = await backend.screenshot_b64()
-            content = _build_step_content(step, live_b64, workflow_summary=flow.context or "")
+            content = _build_step_content(
+                step, live_b64,
+                workflow_summary=flow.context or "",
+                workflow_app=flow.app,
+                workflow_start_url=flow.start_url or "",
+                workflow_alternatives=flow.alternatives,
+            )
 
             # Seed list and save initial frame immediately
             step_shots: list[str] = [live_b64]
@@ -798,23 +921,54 @@ class ComputerFlowRunner:
                     _poll_screenshots(backend, step_shots, shots_dir, label, step_i)
                 )
 
+            # Retry step up to 3 times on exception; the CUA itself handles most
+            # soft failures internally, so retries kick in for network/SDK errors.
+            MAX_STEP_RETRIES = 3
+            ans, n, evs = "", 0, []
+            last_error: Exception | None = None
             try:
-                ans, n, evs = await _run_cua_loop(
-                    lc_sdk=lc_sdk,
-                    backend=backend,
-                    initial_content=content,
-                    model=self.MODEL,
-                    width=opts.viewport_width,
-                    height=opts.viewport_height,
-                    environment=environment,
-                    max_actions=opts.max_actions_per_step,
-                    step_delay_ms=opts.step_delay_ms,
-                    screenshots=step_shots,
-                    shots_dir=shots_dir,
-                    shots_label=label,
-                    shots_step=step_i,
-                    on_event=on_event,
-                )
+                for attempt in range(MAX_STEP_RETRIES):
+                    try:
+                        if attempt > 0:
+                            print(f"  [cua] retry {attempt}/{MAX_STEP_RETRIES - 1} for step {step_i}")
+                            if on_event:
+                                try:
+                                    on_event({"type": "retry", "stepIndex": step_i, "attempt": attempt})
+                                except Exception:
+                                    pass
+                            # Refresh screenshot + content before retrying
+                            live_b64 = await backend.screenshot_b64()
+                            content = _build_step_content(
+                step, live_b64,
+                workflow_summary=flow.context or "",
+                workflow_app=flow.app,
+                workflow_start_url=flow.start_url or "",
+                workflow_alternatives=flow.alternatives,
+            )
+                        ans, n, evs = await _run_cua_loop(
+                            lc_sdk=lc_sdk,
+                            backend=backend,
+                            initial_content=content,
+                            model=self.MODEL,
+                            width=opts.viewport_width,
+                            height=opts.viewport_height,
+                            environment=environment,
+                            max_actions=opts.max_actions_per_step,
+                            step_delay_ms=opts.step_delay_ms,
+                            screenshots=step_shots,
+                            shots_dir=shots_dir,
+                            shots_label=label,
+                            shots_step=step_i,
+                            on_event=on_event,
+                        )
+                        last_error = None
+                        break
+                    except Exception as e:
+                        last_error = e
+                        print(f"  [cua] step {step_i} attempt {attempt + 1} failed: {e}")
+                        await asyncio.sleep(1.5 * (attempt + 1))
+                if last_error is not None:
+                    raise last_error
             finally:
                 if poller_task:
                     poller_task.cancel()
@@ -933,7 +1087,14 @@ def _steps_to_prompt(flow: FlowRequest, steps: list[SOPStep]) -> str:
     return "\n".join(parts)
 
 
-def _build_step_content(step: SOPStep, live_b64: str, workflow_summary: str = "") -> list[dict]:
+def _build_step_content(
+    step: SOPStep,
+    live_b64: str,
+    workflow_summary: str = "",
+    workflow_app: str = "",
+    workflow_start_url: str = "",
+    workflow_alternatives: list[str] | None = None,
+) -> list[dict]:
     """
     Build the `content` array for one CUA loop iteration.
 
@@ -948,13 +1109,24 @@ def _build_step_content(step: SOPStep, live_b64: str, workflow_summary: str = ""
     """
     instruction = ""
     if workflow_summary:
+        instruction += f"OVERALL GOAL (top priority): {workflow_summary}\n"
+    if workflow_app:
+        instruction += f"APP: The workflow runs inside '{workflow_app}'. If the app is not already open/focused, open/focus it first.\n"
+    if workflow_start_url:
+        instruction += f"START URL: The workflow starts at {workflow_start_url}. If you aren't already on that URL (or a compatible one), navigate there before doing the first step.\n"
+    if workflow_alternatives:
+        instruction += "ALTERNATIVE STRATEGIES (use if the recorded path fails):\n"
+        for alt in workflow_alternatives[:5]:
+            instruction += f"  - {alt}\n"
+    if workflow_summary or workflow_app or workflow_start_url or workflow_alternatives:
         instruction += (
-            f"OVERALL GOAL: {workflow_summary}\n\n"
-            "The workflow below was recorded from a user demo; use the overall goal "
-            "to disambiguate individual step intents when they look redundant "
-            "(e.g. a click on empty space that just focuses the window).\n\n"
+            "\nIMPORTANT: The overall goal takes PRIORITY over the exact recorded steps. "
+            "The steps below were captured from a user demo and are a reference, not a strict script. "
+            "You are allowed — and expected — to DEVIATE from the steps when doing so better achieves the goal. "
+            "Skip redundant steps, retry failed actions, adapt to UI differences, and fall back to the alternative strategies above when the obvious path fails. "
+            "Only follow a step literally when it is the best way forward.\n\n"
         )
-    instruction += f"CURRENT STEP: {step.intent}"
+    instruction += f"CURRENT STEP (reference — may deviate if needed): {step.intent}"
     if step.action == ActionType.TYPE and step.text:
         instruction += f' Type: "{step.text}"'
     elif step.action == ActionType.NAVIGATE and step.text:

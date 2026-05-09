@@ -143,6 +143,15 @@ class BackendClient {
         return nil
     }
 
+    // MARK: - Delete Workflow
+    func deleteWorkflow(id: String) async throws {
+        let url = baseURL.appendingPathComponent("workflows/\(id)")
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        let (_, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response)
+    }
+
     // MARK: - Update Workflow
     func updateWorkflow(_ workflow: WorkflowModel) async throws {
         let url = baseURL.appendingPathComponent("workflows/\(workflow.id)")

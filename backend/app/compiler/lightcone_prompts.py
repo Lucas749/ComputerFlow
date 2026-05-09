@@ -16,6 +16,9 @@ OUTPUT: Return ONLY a valid JSON object matching this exact schema — no prose,
 {
   "name": "Short descriptive workflow name (3-6 words)",
   "summary": "High-level plain-English summary of what this workflow accomplishes, written as 1-3 imperative sentences describing the outcome and approach. Example: 'Open Google in a new tab and search for help. Then click the first result.' This will be used by the computer-use agent at run time to understand the overall goal.",
+  "app": "The exact native macOS application the workflow operates in (e.g. 'Google Chrome', 'Safari', 'Microsoft Excel', 'Finder', 'Terminal', 'Slack'). Use 'Google Chrome' if the screenshots show a Chrome browser window. Leave empty string only if truly unclear.",
+  "startUrl": "If the workflow starts in a web browser, the exact URL the user ends up on at the start of the flow (e.g. 'https://www.google.com', 'https://news.ycombinator.com'). Empty string if not applicable. Infer from the visible address bar or page content in the first screenshots.",
+  "alternatives": ["1-3 alternative plain-English approaches the agent could take to achieve the same goal if the exact steps fail. Examples: 'Instead of clicking the search box, focus it with Cmd+L then type', 'If the navigation bar is hidden, press F11 to toggle fullscreen'. These are fallback strategies the agent reads when the recorded path fails."],
   "steps": [
     {
       "id": "s1",
@@ -43,6 +46,9 @@ OUTPUT: Return ONLY a valid JSON object matching this exact schema — no prose,
 
 Rules:
 0. ALWAYS produce a "summary" field with a high-level plain-English description (1-3 sentences) that captures the overall goal the user is trying to accomplish. This is critical — the computer-use agent reads this at runtime to understand intent when individual steps are ambiguous (e.g. if a step says "click empty area" the summary tells the agent it doesn't really matter, the goal is to open a tab and search).
+0b. ALWAYS identify the "app" (native macOS app name) from the screenshots — look at the top-left menu bar, the window chrome, or visible UI cues. Common values: "Google Chrome", "Safari", "Microsoft Excel", "Finder", "Terminal", "Slack", "Visual Studio Code". If truly unclear, use "".
+0c. If (and only if) the workflow operates in a web browser, ALWAYS set "startUrl" to the exact URL shown in the first screenshot's address bar (e.g. "https://www.google.com"). This is what the agent will navigate to before step 1. For non-browser workflows use "".
+0d. ALWAYS provide 1-3 "alternatives" — short plain-English descriptions of other ways the same goal could be achieved if the recorded path fails. Think about what a human would do if the first approach didn't work. For a Google search this could be "Use cmd+L to focus the omnibox directly instead of clicking it" or "If Chrome isn't open, launch it from Dock first". Keep them concrete and actionable.
 1. Merge consecutive key events into a single "type" step. The value is the full typed text.
 2. EXECUTOR ASSIGNMENT — look at the screenshot to determine the context:
    - Use executor.kind="kernel" when the action is happening INSIDE a web browser (Safari, Chrome, Firefox, Arc).

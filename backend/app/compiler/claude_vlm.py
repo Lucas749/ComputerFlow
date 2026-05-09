@@ -41,6 +41,9 @@ def compile_with_claude(
     all_steps: list[dict] = []
     workflow_name = name
     workflow_summary = ""
+    workflow_app = ""
+    workflow_start_url = ""
+    workflow_alternatives: list[str] = []
     variables: list[dict] = []
 
     for chunk_idx, chunk in enumerate(chunks):
@@ -67,6 +70,9 @@ def compile_with_claude(
         if chunk_idx == 0:
             workflow_name = raw_json.get("name") or name
             workflow_summary = (raw_json.get("summary") or "").strip()
+            workflow_app = (raw_json.get("app") or "").strip()
+            workflow_start_url = (raw_json.get("startUrl") or "").strip()
+            workflow_alternatives = raw_json.get("alternatives") or []
             variables = raw_json.get("variables") or []
         else:
             existing_var_names = {v.get("name") for v in variables}
@@ -75,7 +81,15 @@ def compile_with_claude(
                     variables.append(v)
 
     _emit(progress_callback, 2, 85, "Finalising workflow…")
-    merged = {"name": workflow_name, "summary": workflow_summary, "steps": all_steps, "variables": variables}
+    merged = {
+        "name": workflow_name,
+        "summary": workflow_summary,
+        "app": workflow_app,
+        "startUrl": workflow_start_url,
+        "alternatives": workflow_alternatives,
+        "steps": all_steps,
+        "variables": variables,
+    }
     return _build_envelope(workflow_id, name, merged, semantic)
 
 

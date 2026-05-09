@@ -239,6 +239,8 @@ class FlowRequest:
     default_target: RunTarget = RunTarget.AUTO
     default_strategy: ExecutionStrategy = ExecutionStrategy.CUA_LOOP
     start_url: str | None = None            # browser tasks: navigate here first
+    app: str = ""                           # native macOS app name (e.g. "Google Chrome")
+    alternatives: list[str] = field(default_factory=list)  # fallback strategies
     context: str = ""                       # extra context for the model
     options: RunOptions = field(default_factory=RunOptions)
 

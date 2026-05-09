@@ -50,7 +50,12 @@ class WorkflowStore: ObservableObject {
     }
 
     func remove(id: String) {
-        recentWorkflows.removeAll { $0.id == id }
-        save()
+        DispatchQueue.main.async {
+            self.recentWorkflows.removeAll { $0.id == id }
+            self.save()
+        }
+        Task.detached {
+            try? await BackendClient.shared.deleteWorkflow(id: id)
+        }
     }
 }
