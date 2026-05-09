@@ -1,0 +1,42 @@
+# Secrets — never commit
+.env
+*.env
+.env.*
+!.env.example
+
+# Project specs (already excluded)
+/specs
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+.ruff_cache/
+
+# macOS
+.DS_Store
+*.DS_Store
+
+# Xcode / Swift
+*.xcworkspace/
+xcuserdata/
+DerivedData/
+*.xccheckout
+*.resolved
+
+# Data / artefacts
+backend/data/
+*.mp4
+*.log
+*.ndjson
+
+# Node (frontend tooling if added later)
+node_modules/
+.next/
