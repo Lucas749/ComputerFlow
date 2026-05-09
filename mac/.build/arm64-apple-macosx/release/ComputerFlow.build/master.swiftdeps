@@ -1,11 +1,12 @@
 version: "Apple Swift version 5.9.2 (swiftlang-5.9.2.2.56 clang-1500.1.0.2.5)"
 options: "fc511b14f497c3e3bf4c2da3db843d33"
-build_time: [1778354476, 187739000]
+build_time: [1778357970, 409162000]
 inputs:
   "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/App/AppDelegate.swift": [9223372036, 854775807]
   "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/App/AppState.swift": [9223372036, 854775807]
   "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/App/ComputerFlowApp.swift": [9223372036, 854775807]
   "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Compiling/CompilingWindow.swift": [9223372036, 854775807]
+  "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/MenuBar/DisplaySelectorView.swift": [9223372036, 854775807]
   "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/MenuBar/MenuBarController.swift": [9223372036, 854775807]
   "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/MenuBar/MenuBarView.swift": [9223372036, 854775807]
   "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Monitor/PipWindow.swift": [9223372036, 854775807]

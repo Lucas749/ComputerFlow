@@ -7,18 +7,20 @@ class VideoEncoder {
     private var videoInput: AVAssetWriterInput?
     private var sessionStarted = false
 
-    func setup(outputURL: URL) throws {
-        // Remove existing file
+    func setup(outputURL: URL, width: Int, height: Int) throws {
+        sessionStarted = false
+        assetWriter = nil
+        videoInput = nil
         try? FileManager.default.removeItem(at: outputURL)
 
         assetWriter = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
 
         let settings: [String: Any] = [
             AVVideoCodecKey: AVVideoCodecType.h264,
-            AVVideoWidthKey: 1920,
-            AVVideoHeightKey: 1080,
+            AVVideoWidthKey: width,
+            AVVideoHeightKey: height,
             AVVideoCompressionPropertiesKey: [
-                AVVideoAverageBitRateKey: 4_000_000
+                AVVideoAverageBitRateKey: 8_000_000
             ]
         ]
 
@@ -28,7 +30,6 @@ class VideoEncoder {
         if let input = videoInput {
             assetWriter?.add(input)
         }
-
         assetWriter?.startWriting()
     }
 
@@ -41,7 +42,6 @@ class VideoEncoder {
             writer.startSession(atSourceTime: pts)
             sessionStarted = true
         }
-
         input.append(sampleBuffer)
     }
 
@@ -49,17 +49,15 @@ class VideoEncoder {
         guard let writer = assetWriter else { return }
         videoInput?.markAsFinished()
         await withCheckedContinuation { continuation in
-            writer.finishWriting {
-                continuation.resume()
-            }
+            writer.finishWriting { continuation.resume() }
         }
         if writer.status == .failed {
             throw writer.error ?? VideoEncoderError.writeFailed
         }
+        assetWriter = nil
+        videoInput = nil
+        sessionStarted = false
     }
 }
 
-// MARK: - VideoEncoderError
-enum VideoEncoderError: Error {
-    case writeFailed
-}
+enum VideoEncoderError: Error { case writeFailed }

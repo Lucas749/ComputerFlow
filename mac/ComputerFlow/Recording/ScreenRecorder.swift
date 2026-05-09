@@ -9,30 +9,40 @@ class ScreenRecorder: NSObject, ObservableObject {
 
     private(set) var outputURL: URL?
 
+    // Which display to record — nil means "first available"
+    var selectedDisplayID: CGDirectDisplayID?
+
     func startRecording() async throws {
-        // Generate output URL
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let tmpDir = appSupport.appendingPathComponent("ComputerFlow/tmp", isDirectory: true)
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         let url = tmpDir.appendingPathComponent("\(UUID().uuidString).mp4")
         outputURL = url
 
-        try encoder.setup(outputURL: url)
-
-        let config = SCStreamConfiguration()
-        config.minimumFrameInterval = CMTime(value: 1, timescale: 10) // 10 fps
-        config.width = 1920
-        config.height = 1080
-
-        // Get available content
         let availableContent = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-        guard let display = availableContent.displays.first else {
+
+        let display: SCDisplay
+        if let id = selectedDisplayID,
+           let match = availableContent.displays.first(where: { $0.displayID == id }) {
+            display = match
+        } else if let first = availableContent.displays.first {
+            display = first
+        } else {
             throw RecorderError.noDisplay
         }
 
+        let w = display.width
+        let h = display.height
+
+        let config = SCStreamConfiguration()
+        config.minimumFrameInterval = CMTime(value: 1, timescale: 10)
+        config.width  = w
+        config.height = h
+
+        try encoder.setup(outputURL: url, width: w, height: h)
+
         let filter = SCContentFilter(display: display, excludingApplications: [], exceptingWindows: [])
         stream = SCStream(filter: filter, configuration: config, delegate: self)
-
         try stream?.addStreamOutput(self, type: .screen, sampleHandlerQueue: DispatchQueue.global(qos: .userInteractive))
         try await stream?.startCapture()
     }
@@ -43,6 +53,12 @@ class ScreenRecorder: NSObject, ObservableObject {
         guard let url = outputURL else { throw RecorderError.noOutput }
         try await encoder.finishWriting()
         return url
+    }
+
+    // Fetch all available displays (call before showing picker)
+    static func availableDisplays() async -> [SCDisplay] {
+        guard let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true) else { return [] }
+        return content.displays
     }
 }
 
@@ -69,7 +85,7 @@ enum RecorderError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .noDisplay: return "No display available for capture"
-        case .noOutput: return "No output URL available"
+        case .noOutput:  return "No output URL available"
         }
     }
 }

@@ -5,7 +5,7 @@ Live integration test: browser + desktop handoff.
     Navigate to Hacker News, read the #1 article title, remember it.
 
   Group 2 (LIGHTCONE_OS, CUA_LOOP):
-    Open LibreOffice Calc, type that title into cell A1.
+    Open a text editor, type that title into it, and save.
 
 This exercises the full handoff flow: two targets, two sessions, one run.
 Both live-view URLs are printed so you can watch both surfaces simultaneously.
@@ -27,10 +27,10 @@ from app.infra.types import (
 
 
 FLOW = FlowRequest(
-    title="HN title → LibreOffice A1 (mixed handoff)",
+    title="HN title → text editor (mixed handoff)",
     goal=(
         "Read the title of the #1 story on Hacker News, "
-        "then type that exact title into cell A1 of a LibreOffice Calc spreadsheet."
+        "then type that exact title into a text editor on the desktop."
     ),
     steps=[
         # ── Group 1: browser ──────────────────────────────────────────────────
@@ -49,12 +49,13 @@ FLOW = FlowRequest(
         # ── Group 2: desktop (handoff) ────────────────────────────────────────
         SOPStep(
             intent=(
-                "Open a terminal and run: apt-get install -y libreoffice 2>/dev/null; libreoffice --calc &\n"
-                "Wait for LibreOffice Calc to fully open. "
-                "Click cell A1 (the top-left cell). "
+                "Open a terminal. Run: mousepad &\n"
+                "Wait for the Mousepad text editor to open. "
+                "If mousepad is not available, try: gedit & or xed &\n"
+                "Once a text editor is open, click in the text area. "
                 "Type the Hacker News article title that was retrieved in the previous step. "
-                "Press Enter to confirm. "
-                "The cell should now contain the article title."
+                "Save the file (Ctrl+S). "
+                "The editor should now contain the article title."
             ),
             action=ActionType.TYPE,
             surface=Surface.DESKTOP,
@@ -68,8 +69,8 @@ FLOW = FlowRequest(
         viewport_height=720,
         stealth=True,
         step_delay_ms=1500,
-        max_actions_per_step=40,
-        max_total_actions=150,
+        max_actions_per_step=100,
+        max_total_actions=300,
     ),
 )
 
@@ -77,7 +78,7 @@ FLOW = FlowRequest(
 async def main() -> None:
     runner = ComputerFlowRunner(open_live_views=True)
     print("=" * 70)
-    print("TEST: browser (HN title) + desktop handoff (LibreOffice A1)")
+    print("TEST: browser (HN title) + desktop handoff (text editor)")
     print("=" * 70)
     print(
         "\nNote: the browser step extracts the title; the desktop step types it.\n"

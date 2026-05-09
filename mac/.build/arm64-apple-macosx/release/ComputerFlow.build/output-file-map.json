@@ -24,6 +24,11 @@
     "swiftmodule": "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Compiling/CompilingWindow~partial.swiftmodule",
     "swift-dependencies": "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Compiling/CompilingWindow.swiftdeps"
   },
+  "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/MenuBar/DisplaySelectorView.swift": {
+    "object": "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/MenuBar/DisplaySelectorView.swift.o",
+    "swiftmodule": "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/MenuBar/DisplaySelectorView~partial.swiftmodule",
+    "swift-dependencies": "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/MenuBar/DisplaySelectorView.swiftdeps"
+  },
   "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/MenuBar/MenuBarController.swift": {
     "object": "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/MenuBar/MenuBarController.swift.o",
     "swiftmodule": "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/MenuBar/MenuBarController~partial.swiftmodule",

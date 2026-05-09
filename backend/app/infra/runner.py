@@ -167,9 +167,15 @@ class LightconeOSBackend:
     with the CUA protocol described at docs.lightcone.ai/guides/cua-protocol/.
     """
 
-    def __init__(self, lc_sdk: Any, computer_id: str) -> None:
+    def __init__(self, lc_sdk: Any, computer_id: str, width: int = 1280, height: int = 720) -> None:
         self._lc = lc_sdk
         self._cid = computer_id
+        self._w = width
+        self._h = height
+
+    def _px(self, x: float, y: float) -> tuple[int, int]:
+        """Denormalize 0-999 model coordinates → pixel coordinates."""
+        return int(x / 1000 * self._w), int(y / 1000 * self._h)
 
     async def screenshot_b64(self) -> str:
         raw = await self._lc.computers.screenshot(self._cid, base64=True)
@@ -195,13 +201,16 @@ class LightconeOSBackend:
         cid = self._cid
 
         if t == "click":
-            await self._lc.computers.click(cid, x=action.x, y=action.y)
+            x, y = self._px(action.x, action.y)
+            await self._lc.computers.click(cid, x=x, y=y)
 
         elif t == "double_click":
-            await self._lc.computers.double_click(cid, x=action.x, y=action.y)
+            x, y = self._px(action.x, action.y)
+            await self._lc.computers.double_click(cid, x=x, y=y)
 
         elif t == "right_click":
-            await self._lc.computers.right_click(cid, x=action.x, y=action.y)
+            x, y = self._px(action.x, action.y)
+            await self._lc.computers.right_click(cid, x=x, y=y)
 
         elif t == "type":
             await self._lc.computers.type(cid, text=action.text)
@@ -211,27 +220,17 @@ class LightconeOSBackend:
             await self._lc.computers.hotkey(cid, keys=keys)
 
         elif t == "scroll":
-            await self._lc.computers.scroll(
-                cid,
-                x=getattr(action, "x", 640),
-                y=getattr(action, "y", 360),
-                dx=0,
-                dy=getattr(action, "scroll_y", 0),
-            )
+            x, y = self._px(getattr(action, "x", 500), getattr(action, "y", 500))
+            await self._lc.computers.scroll(cid, x=x, y=y, dx=0, dy=getattr(action, "scroll_y", 0))
 
         elif t == "hscroll":
-            await self._lc.computers.scroll(
-                cid,
-                x=getattr(action, "x", 640),
-                y=getattr(action, "y", 360),
-                dx=getattr(action, "scroll_x", 0),
-                dy=0,
-            )
+            x, y = self._px(getattr(action, "x", 500), getattr(action, "y", 500))
+            await self._lc.computers.scroll(cid, x=x, y=y, dx=getattr(action, "scroll_x", 0), dy=0)
 
         elif t == "drag":
-            await self._lc.computers.drag(
-                cid, x=action.x, y=action.y, end_x=action.end_x, end_y=action.end_y
-            )
+            x, y = self._px(action.x, action.y)
+            ex, ey = self._px(action.end_x, action.end_y)
+            await self._lc.computers.drag(cid, x=x, y=y, end_x=ex, end_y=ey)
 
         elif t == "navigate":
             await self._lc.computers.navigate(cid, url=getattr(action, "url", ""))
@@ -290,6 +289,17 @@ class LocalCUABackend:
 
 # ── CUA loop (shared across all backends) ────────────────────────────────────
 
+def _save_frame(b64: str, shots_dir: str, label: str, step_i: int, frame_i: int) -> str:
+    """Write a single b64 frame to disk immediately. Returns the saved path."""
+    import base64 as _b64, os as _os
+    ext = "jpg" if b64.startswith("/9j/") else "png"
+    fname = f"{label}_step{step_i:02d}_frame{frame_i:03d}.{ext}"
+    path = _os.path.join(shots_dir, fname)
+    with open(path, "wb") as f:
+        f.write(_b64.b64decode(b64))
+    return path
+
+
 async def _run_cua_loop(
     lc_sdk: Any,
     backend: CUABackend,
@@ -300,6 +310,10 @@ async def _run_cua_loop(
     environment: str,
     max_actions: int,
     step_delay_ms: int,
+    screenshots: list[str] | None = None,  # kept for compat; frames also saved to disk immediately
+    shots_dir: str | None = None,   # if set, every frame is written to disk as captured
+    shots_label: str = "session",   # filename prefix
+    shots_step: int = 0,            # step index for filename
 ) -> tuple[str, int, list[Any]]:
     """
     Core CUA protocol loop — identical for all three backends.
@@ -308,6 +322,7 @@ async def _run_cua_loop(
       screenshot → model → action → execute → repeat
 
     Returns (answer, actions_taken, events).
+    Every screenshot is written to shots_dir immediately on capture (not buffered).
     """
     computer_tool = {
         "type": "computer_use",
@@ -335,7 +350,6 @@ async def _run_cua_loop(
                 break
 
         if not computer_call:
-            # No pending action — extract text answer
             answer = _extract_text(response)
             break
 
@@ -343,7 +357,6 @@ async def _run_cua_loop(
         action_type = getattr(action, "type", "unknown")
         events.append({"action": action_type})
 
-        # Terminal actions
         if action_type in ("terminate", "done", "answer"):
             answer = (
                 getattr(action, "text", "")
@@ -358,6 +371,14 @@ async def _run_cua_loop(
         await asyncio.sleep(step_delay_ms / 1000)
 
         b64 = await backend.screenshot_b64()
+        if screenshots is not None:
+            screenshots.append(b64)
+        if shots_dir and b64:
+            # use list length as frame index so CUA frames slot in among poller frames
+            fi = (len(screenshots) - 1) if screenshots is not None else actions_taken
+            _save_frame(b64, shots_dir, shots_label, shots_step, fi)
+
+        mime = "image/jpeg" if b64.startswith("/9j/") else "image/png"
         response = await lc_sdk.responses.create(
             model=model,
             previous_response_id=response.id,
@@ -366,14 +387,13 @@ async def _run_cua_loop(
                 "call_id": computer_call.call_id,
                 "output": {
                     "type": "input_image",
-                    "image_url": f"data:image/jpeg;base64,{b64}" if b64.startswith("/9j/") else f"data:image/png;base64,{b64}",
+                    "image_url": f"data:{mime};base64,{b64}",
                     "detail": "auto",
                 },
             }],
             tools=[computer_tool],
         )
 
-    # If the loop exhausted without a terminal action, pull whatever text is in the last response
     answer = answer or _extract_text(response)
     return answer, actions_taken, events
 
@@ -545,6 +565,7 @@ class ComputerFlowRunner:
                     ans, n, evs = await self._run_group_cua(
                         lc_sdk, backend, flow, group_steps, opts,
                         environment="browser",
+                        session_label=f"kernel_{kernel_session_id[-8:]}",
                     )
 
                 elif group_target == RunTarget.LIGHTCONE_OS:
@@ -569,10 +590,11 @@ class ComputerFlowRunner:
                             print(f"[lightcone] opening live view in browser...")
                             _sp.Popen(["open", lc_live])
 
-                    backend = LightconeOSBackend(lc_sdk, lightcone_computer_id)
+                    backend = LightconeOSBackend(lc_sdk, lightcone_computer_id, opts.viewport_width, opts.viewport_height)
                     ans, n, evs = await self._run_group_cua(
                         lc_sdk, backend, flow, group_steps, opts,
                         environment="desktop",
+                        session_label=f"lightcone_{lightcone_computer_id[-8:]}",
                     )
 
                 elif group_target == RunTarget.LOCAL:
@@ -582,6 +604,7 @@ class ComputerFlowRunner:
                     ans, n, evs = await self._run_group_cua(
                         lc_sdk, backend, flow, group_steps, opts,
                         environment="desktop",
+                        session_label="local",
                     )
                 else:
                     raise ValueError(f"Unhandled target: {group_target!r}")
@@ -607,12 +630,37 @@ class ComputerFlowRunner:
                     print(f"[kernel] session {kernel_session_id} deleted")
                 except Exception:
                     pass
-            if lightcone_computer_id and lc_sdk and not opts.environment_id:
+            if lightcone_computer_id and lc_sdk:
+                # Capture final screenshot before deletion so the result is verifiable
                 try:
-                    await lc_sdk.computers.delete(lightcone_computer_id)
-                    print(f"[lightcone] computer {lightcone_computer_id} deleted")
-                except Exception:
-                    pass
+                    raw_shot = await lc_sdk.computers.screenshot(lightcone_computer_id, base64=True)
+                    result_field = getattr(raw_shot, "result", None)
+                    b64 = (
+                        result_field.get("screenshot_url") if isinstance(result_field, dict)
+                        else result_field
+                    ) or ""
+                    if b64:
+                        import base64 as _b64, os as _os, subprocess as _sp
+                        shot_path = _os.path.join(
+                            _os.path.dirname(_os.path.abspath(__file__)),
+                            f"../../../screenshots/lightcone_final_{lightcone_computer_id[-8:]}.jpg"
+                        )
+                        shot_path = _os.path.normpath(shot_path)
+                        _os.makedirs(_os.path.dirname(shot_path), exist_ok=True)
+                        with open(shot_path, "wb") as f:
+                            f.write(_b64.b64decode(b64))
+                        print(f"[lightcone] final screenshot → {shot_path}")
+                        if self._open_live_views:
+                            _sp.Popen(["open", shot_path])
+                except Exception as e:
+                    print(f"[lightcone] screenshot failed (non-fatal): {e}")
+
+                if not opts.environment_id:
+                    try:
+                        await lc_sdk.computers.delete(lightcone_computer_id)
+                        print(f"[lightcone] computer {lightcone_computer_id} deleted")
+                    except Exception:
+                        pass
 
         live_view_urls.pop("_browser_started", None)
         return FlowResult(
@@ -632,24 +680,29 @@ class ComputerFlowRunner:
         steps: list[SOPStep],
         opts: RunOptions,
         environment: str,
+        session_label: str = "",
     ) -> tuple[str, int, list[Any]]:
         """
         Run a group of steps via the CUA loop on a given backend.
 
-        Each step gets its own Northstar call seeded with:
-          - The step instruction (intent + action detail)
-          - The current live screenshot
-          - The reference screenshot from the recording (if present)
+        Every screenshot captured during the loop is saved to
+        screenshots/<label>_step<N>_action<M>.jpg so you can verify
+        what happened at each step without a live viewer.
         """
+        import base64 as _b64, os as _os, subprocess as _sp
+
+        shots_dir = _os.path.normpath(
+            _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "../../../screenshots")
+        )
+        _os.makedirs(shots_dir, exist_ok=True)
+
         total_answer = ""
         total_actions = 0
         total_events: list[Any] = []
 
-        for step in steps:
+        for step_i, step in enumerate(steps):
             print(f"  [cua] {step.intent[:80]}")
 
-            # For browser steps with a URL, pre-navigate via Playwright so Northstar
-            # starts on the loaded page rather than wasting actions navigating.
             if (
                 environment == "browser"
                 and step.action == ActionType.NAVIGATE
@@ -666,20 +719,64 @@ class ComputerFlowRunner:
                 )
                 await asyncio.sleep(1.5)
 
+            label = session_label or environment
+            # open folder immediately so user can watch frames appear live
+            if self._open_live_views:
+                _sp.Popen(["open", shots_dir])
+
             live_b64 = await backend.screenshot_b64()
             content = _build_step_content(step, live_b64)
 
-            ans, n, evs = await _run_cua_loop(
-                lc_sdk=lc_sdk,
-                backend=backend,
-                initial_content=content,
-                model=self.MODEL,
-                width=opts.viewport_width,
-                height=opts.viewport_height,
-                environment=environment,
-                max_actions=opts.max_actions_per_step,
-                step_delay_ms=opts.step_delay_ms,
-            )
+            # Seed list and save initial frame immediately
+            step_shots: list[str] = [live_b64]
+            _save_frame(live_b64, shots_dir, label, step_i, 0)
+
+            # For Lightcone OS: background poller captures frames every 3s during
+            # slow operations (app launch, installs) between CUA actions.
+            poller_task = None
+            if isinstance(backend, LightconeOSBackend):
+                async def _poll_screenshots(b: LightconeOSBackend, out: list[str],
+                                            sd: str, lbl: str, si: int) -> None:
+                    while True:
+                        await asyncio.sleep(3)
+                        try:
+                            b64 = await b.screenshot_b64()
+                            if b64 and (not out or b64 != out[-1]):
+                                fi = len(out)
+                                out.append(b64)
+                                _save_frame(b64, sd, lbl, si, fi)
+                        except Exception:
+                            pass
+                poller_task = asyncio.create_task(
+                    _poll_screenshots(backend, step_shots, shots_dir, label, step_i)
+                )
+
+            try:
+                ans, n, evs = await _run_cua_loop(
+                    lc_sdk=lc_sdk,
+                    backend=backend,
+                    initial_content=content,
+                    model=self.MODEL,
+                    width=opts.viewport_width,
+                    height=opts.viewport_height,
+                    environment=environment,
+                    max_actions=opts.max_actions_per_step,
+                    step_delay_ms=opts.step_delay_ms,
+                    screenshots=step_shots,
+                    shots_dir=shots_dir,
+                    shots_label=label,
+                    shots_step=step_i,
+                )
+            finally:
+                if poller_task:
+                    poller_task.cancel()
+                    try:
+                        await poller_task
+                    except asyncio.CancelledError:
+                        pass
+
+            print(f"  [screenshots] {len(step_shots)} frames saved → screenshots/{label}_step{step_i:02d}_*")
+
             total_answer = ans or total_answer
             total_actions += n
             total_events.extend(evs)
@@ -703,7 +800,7 @@ class ComputerFlowRunner:
         if target == RunTarget.KERNEL_BROWSER and kernel_session_id:
             backend = KernelBrowserBackend(kernel_sdk, kernel_session_id)
         elif target == RunTarget.LIGHTCONE_OS and lightcone_computer_id:
-            backend = LightconeOSBackend(lc_sdk, lightcone_computer_id)
+            backend = LightconeOSBackend(lc_sdk, lightcone_computer_id, opts.viewport_width, opts.viewport_height)
         elif target == RunTarget.LOCAL:
             backend = LocalCUABackend()
         else:

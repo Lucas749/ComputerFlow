@@ -28,6 +28,8 @@
     <string>ComputerFlow records your screen to build automation workflows.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>ComputerFlow may capture audio during screen recording.</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
 </dict>

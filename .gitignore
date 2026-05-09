@@ -33,6 +33,7 @@ DerivedData/
 
 # Data / artefacts
 backend/data/
+screenshots/
 *.mp4
 *.log
 *.ndjson

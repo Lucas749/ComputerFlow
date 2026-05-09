@@ -1,5 +1,5 @@
 """
-Live integration test: Lightcone OS → LibreOffice Calc → type "Hello" in A1.
+Live integration test: Lightcone OS → gedit/mousepad text editor → type "Hello" and save.
 
 Target:   LIGHTCONE_OS
 Strategy: CUA_LOOP (single step)
@@ -21,17 +21,18 @@ from app.infra.types import (
 
 
 FLOW = FlowRequest(
-    title="LibreOffice Calc — Hello in A1",
-    goal="Open LibreOffice Calc, click cell A1, type 'Hello', press Enter.",
+    title="Text Editor — Hello",
+    goal="Open a text editor, type 'Hello', and save the file.",
     steps=[
         SOPStep(
             intent=(
-                "Open a terminal. Run: apt-get install -y libreoffice 2>/dev/null; libreoffice --calc &\n"
-                "Wait for LibreOffice Calc to open. "
-                "Click on cell A1 (the top-left cell in the spreadsheet). "
+                "Open a terminal. Run: mousepad &\n"
+                "Wait for the Mousepad text editor to open. "
+                "If mousepad is not available, try: gedit & or xed & or nano /tmp/hello.txt\n"
+                "Once a text editor is open, click in the text area. "
                 "Type the word 'Hello'. "
-                "Press Enter to confirm the entry. "
-                "Confirm 'Hello' is now visible in cell A1."
+                "Save the file (Ctrl+S). "
+                "Confirm 'Hello' is now visible in the editor."
             ),
             action=ActionType.TYPE,
             surface=Surface.DESKTOP,
@@ -46,8 +47,8 @@ FLOW = FlowRequest(
         viewport_width=1280,
         viewport_height=720,
         step_delay_ms=2000,
-        max_actions_per_step=60,
-        max_total_actions=120,
+        max_actions_per_step=100,
+        max_total_actions=200,
     ),
 )
 
@@ -55,7 +56,7 @@ FLOW = FlowRequest(
 async def main() -> None:
     runner = ComputerFlowRunner(open_live_views=True)
     print("=" * 70)
-    print("TEST: Lightcone OS → LibreOffice Calc → type Hello in A1")
+    print("TEST: Lightcone OS → text editor → type Hello")
     print("=" * 70)
 
     result = await runner.run_flow(FLOW)

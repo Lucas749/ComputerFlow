@@ -184,52 +184,18 @@ async def _run_compile(workflow_id: str, name: str, db: Session) -> None:
             except Exception:
                 events_data = []
 
-        has_event_shots = shots_dir.exists() and any(shots_dir.glob("ev_*.jpg"))
-
-        if has_event_shots and events_data:
-            await emit(0, 15, "Using pre-action screenshots…")
-
-            workflow_json = await loop.run_in_executor(
-                None,
-                lambda: compile_with_lightcone(
-                    workflow_id=workflow_id,
-                    events=events_data,
-                    screenshots_dir=shots_dir,
-                    name=name,
-                    progress_callback=emit_sync,
-                ),
-            )
-        else:
-            # ── Fallback: Claude video-frame pipeline ─────────────────────
-            await emit(0, 10, "Parsing video frames…")
-            from app.compiler.frames import extract_candidates
-            from app.compiler.frame_selector import select_frames
-            from app.compiler.vlm import compile_to_workflow
-            from app.store import video_path as get_video_path
-
-            vid = get_video_path(workflow_id)
-
-            candidates = await loop.run_in_executor(
-                None, extract_candidates, vid, events_data or None
-            )
-            await emit(1, 30, "Selecting key frames…")
-            selected = await loop.run_in_executor(None, select_frames, candidates)
-
-            await emit(1, 40, "Identifying UI elements…")
-
-            async def progress_cb(stage: int, progress: int, subline: str) -> None:
-                await emit(stage, progress, subline)
-
-            workflow_json = await loop.run_in_executor(
-                None,
-                lambda: compile_to_workflow(
-                    workflow_id=workflow_id,
-                    frames=selected,
-                    events=events_data,
-                    name=name,
-                    progress_callback=progress_cb,
-                ),
-            )
+        # Always use Lightcone — it handles empty events gracefully
+        await emit(0, 15, "Using pre-action screenshots…")
+        workflow_json = await loop.run_in_executor(
+            None,
+            lambda: compile_with_lightcone(
+                workflow_id=workflow_id,
+                events=events_data,
+                screenshots_dir=shots_dir,
+                name=name,
+                progress_callback=emit_sync,
+            ),
+        )
 
         store.update_workflow_json(workflow_id, workflow_json)
         await emit(3, 100, "Complete", workflowId=workflow_id)
