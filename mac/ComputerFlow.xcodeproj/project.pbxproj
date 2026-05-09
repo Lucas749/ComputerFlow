@@ -1,0 +1,520 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A001 /* ComputerFlowApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F001 /* ComputerFlowApp.swift */; };
+		A002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F002 /* AppDelegate.swift */; };
+		A003 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F003 /* AppState.swift */; };
+		A004 /* MenuBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F004 /* MenuBarController.swift */; };
+		A005 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F005 /* MenuBarView.swift */; };
+		A006 /* HotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F006 /* HotkeyManager.swift */; };
+		A007 /* RecordingPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F007 /* RecordingPanel.swift */; };
+		A008 /* ScreenRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = F008 /* ScreenRecorder.swift */; };
+		A009 /* VideoEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = F009 /* VideoEncoder.swift */; };
+		A010 /* EventTelemetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = F010 /* EventTelemetry.swift */; };
+		A011 /* CompilingWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F011 /* CompilingWindow.swift */; };
+		A012 /* WorkflowModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F012 /* WorkflowModel.swift */; };
+		A013 /* WorkflowConfirmation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F013 /* WorkflowConfirmation.swift */; };
+		A014 /* WorkflowEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F014 /* WorkflowEditor.swift */; };
+		A015 /* StepRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F015 /* StepRow.swift */; };
+		A016 /* ScreenshotPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F016 /* ScreenshotPanel.swift */; };
+		A017 /* PipWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F017 /* PipWindow.swift */; };
+		A018 /* RunController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F018 /* RunController.swift */; };
+		A019 /* BackendClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F019 /* BackendClient.swift */; };
+		A020 /* WorkflowStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F020 /* WorkflowStore.swift */; };
+		A021 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F021 /* Theme.swift */; };
+		A022 /* PermissionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F022 /* PermissionsView.swift */; };
+		A023 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F023 /* Assets.xcassets */; };
+		A024 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = F024 /* Info.plist */; };
+		/* ScreenCaptureKit.framework */
+		A030 /* ScreenCaptureKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F030 /* ScreenCaptureKit.framework */; };
+		A031 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F031 /* AVFoundation.framework */; };
+		A032 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F032 /* WebKit.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		F001 /* ComputerFlowApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComputerFlowApp.swift; sourceTree = "<group>"; };
+		F002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		F003 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		F004 /* MenuBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarController.swift; sourceTree = "<group>"; };
+		F005 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
+		F006 /* HotkeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyManager.swift; sourceTree = "<group>"; };
+		F007 /* RecordingPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingPanel.swift; sourceTree = "<group>"; };
+		F008 /* ScreenRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenRecorder.swift; sourceTree = "<group>"; };
+		F009 /* VideoEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoEncoder.swift; sourceTree = "<group>"; };
+		F010 /* EventTelemetry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventTelemetry.swift; sourceTree = "<group>"; };
+		F011 /* CompilingWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompilingWindow.swift; sourceTree = "<group>"; };
+		F012 /* WorkflowModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowModel.swift; sourceTree = "<group>"; };
+		F013 /* WorkflowConfirmation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowConfirmation.swift; sourceTree = "<group>"; };
+		F014 /* WorkflowEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowEditor.swift; sourceTree = "<group>"; };
+		F015 /* StepRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StepRow.swift; sourceTree = "<group>"; };
+		F016 /* ScreenshotPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotPanel.swift; sourceTree = "<group>"; };
+		F017 /* PipWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipWindow.swift; sourceTree = "<group>"; };
+		F018 /* RunController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunController.swift; sourceTree = "<group>"; };
+		F019 /* BackendClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendClient.swift; sourceTree = "<group>"; };
+		F020 /* WorkflowStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowStore.swift; sourceTree = "<group>"; };
+		F021 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		F022 /* PermissionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsView.swift; sourceTree = "<group>"; };
+		F023 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F024 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		F025 /* ComputerFlow.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ComputerFlow.entitlements; sourceTree = "<group>"; };
+		F030 /* ScreenCaptureKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ScreenCaptureKit.framework; path = System/Library/Frameworks/ScreenCaptureKit.framework; sourceTree = SDKROOT; };
+		F031 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
+		F032 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
+		PROD_REF /* ComputerFlow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ComputerFlow.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		FWKPHASE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A030 /* ScreenCaptureKit.framework in Frameworks */,
+				A031 /* AVFoundation.framework in Frameworks */,
+				A032 /* WebKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		ROOT_GROUP /* = */ = {
+			isa = PBXGroup;
+			children = (
+				GRP_APP /* ComputerFlow */,
+				GRP_FRAMEWORKS /* Frameworks */,
+				GRP_PRODUCTS /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+
+		GRP_PRODUCTS /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				PROD_REF /* ComputerFlow.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+
+		GRP_FRAMEWORKS /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				F030 /* ScreenCaptureKit.framework */,
+				F031 /* AVFoundation.framework */,
+				F032 /* WebKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+
+		GRP_APP /* ComputerFlow */ = {
+			isa = PBXGroup;
+			children = (
+				GRP_APPDIR /* App */,
+				GRP_MENUBAR /* MenuBar */,
+				GRP_RECORDING /* Recording */,
+				GRP_COMPILING /* Compiling */,
+				GRP_WORKFLOW /* Workflow */,
+				GRP_MONITOR /* Monitor */,
+				GRP_NET /* Net */,
+				GRP_PERMISSIONS /* Permissions */,
+				F021 /* Theme.swift */,
+				F023 /* Assets.xcassets */,
+				F024 /* Info.plist */,
+				F025 /* ComputerFlow.entitlements */,
+			);
+			path = ComputerFlow;
+			sourceTree = "<group>";
+		};
+
+		GRP_APPDIR /* App */ = {
+			isa = PBXGroup;
+			children = (
+				F001 /* ComputerFlowApp.swift */,
+				F002 /* AppDelegate.swift */,
+				F003 /* AppState.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+
+		GRP_MENUBAR /* MenuBar */ = {
+			isa = PBXGroup;
+			children = (
+				F004 /* MenuBarController.swift */,
+				F005 /* MenuBarView.swift */,
+			);
+			path = MenuBar;
+			sourceTree = "<group>";
+		};
+
+		GRP_RECORDING /* Recording */ = {
+			isa = PBXGroup;
+			children = (
+				F006 /* HotkeyManager.swift */,
+				F007 /* RecordingPanel.swift */,
+				F008 /* ScreenRecorder.swift */,
+				F009 /* VideoEncoder.swift */,
+				F010 /* EventTelemetry.swift */,
+			);
+			path = Recording;
+			sourceTree = "<group>";
+		};
+
+		GRP_COMPILING /* Compiling */ = {
+			isa = PBXGroup;
+			children = (
+				F011 /* CompilingWindow.swift */,
+			);
+			path = Compiling;
+			sourceTree = "<group>";
+		};
+
+		GRP_WORKFLOW /* Workflow */ = {
+			isa = PBXGroup;
+			children = (
+				F012 /* WorkflowModel.swift */,
+				F013 /* WorkflowConfirmation.swift */,
+				F014 /* WorkflowEditor.swift */,
+				F015 /* StepRow.swift */,
+				F016 /* ScreenshotPanel.swift */,
+			);
+			path = Workflow;
+			sourceTree = "<group>";
+		};
+
+		GRP_MONITOR /* Monitor */ = {
+			isa = PBXGroup;
+			children = (
+				F017 /* PipWindow.swift */,
+				F018 /* RunController.swift */,
+			);
+			path = Monitor;
+			sourceTree = "<group>";
+		};
+
+		GRP_NET /* Net */ = {
+			isa = PBXGroup;
+			children = (
+				F019 /* BackendClient.swift */,
+				F020 /* WorkflowStore.swift */,
+			);
+			path = Net;
+			sourceTree = "<group>";
+		};
+
+		GRP_PERMISSIONS /* Permissions */ = {
+			isa = PBXGroup;
+			children = (
+				F022 /* PermissionsView.swift */,
+			);
+			path = Permissions;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		TARGET_CF /* ComputerFlow */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BUILDCFG_LIST /* Build configuration list for PBXNativeTarget "ComputerFlow" */;
+			buildPhases = (
+				SRCPHASE /* Sources */,
+				FWKPHASE /* Frameworks */,
+				RESPHASE /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ComputerFlow;
+			productName = ComputerFlow;
+			productReference = PROD_REF /* ComputerFlow.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		PROJECT /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					TARGET_CF = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = BUILDCFG_PROJ /* Build configuration list for PBXProject "ComputerFlow" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = ROOT_GROUP;
+			productRefGroup = GRP_PRODUCTS /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				TARGET_CF /* ComputerFlow */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		RESPHASE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A023 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		SRCPHASE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A001 /* ComputerFlowApp.swift in Sources */,
+				A002 /* AppDelegate.swift in Sources */,
+				A003 /* AppState.swift in Sources */,
+				A004 /* MenuBarController.swift in Sources */,
+				A005 /* MenuBarView.swift in Sources */,
+				A006 /* HotkeyManager.swift in Sources */,
+				A007 /* RecordingPanel.swift in Sources */,
+				A008 /* ScreenRecorder.swift in Sources */,
+				A009 /* VideoEncoder.swift in Sources */,
+				A010 /* EventTelemetry.swift in Sources */,
+				A011 /* CompilingWindow.swift in Sources */,
+				A012 /* WorkflowModel.swift in Sources */,
+				A013 /* WorkflowConfirmation.swift in Sources */,
+				A014 /* WorkflowEditor.swift in Sources */,
+				A015 /* StepRow.swift in Sources */,
+				A016 /* ScreenshotPanel.swift in Sources */,
+				A017 /* PipWindow.swift in Sources */,
+				A018 /* RunController.swift in Sources */,
+				A019 /* BackendClient.swift in Sources */,
+				A020 /* WorkflowStore.swift in Sources */,
+				A021 /* Theme.swift in Sources */,
+				A022 /* PermissionsView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		BCFG_DEBUG_PROJ /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_CYCLE = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		BCFG_RELEASE_PROJ /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_CYCLE = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+			};
+			name = Release;
+		};
+		BCFG_DEBUG_TGT /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ComputerFlow/ComputerFlow.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ComputerFlow/Info.plist;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.computerflow.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.9;
+				OTHER_LDFLAGS = (
+					"-framework",
+					"Carbon",
+				);
+			};
+			name = Debug;
+		};
+		BCFG_RELEASE_TGT /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ComputerFlow/ComputerFlow.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ComputerFlow/Info.plist;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.computerflow.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.9;
+				OTHER_LDFLAGS = (
+					"-framework",
+					"Carbon",
+				);
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		BUILDCFG_PROJ /* Build configuration list for PBXProject "ComputerFlow" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BCFG_DEBUG_PROJ /* Debug */,
+				BCFG_RELEASE_PROJ /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BUILDCFG_LIST /* Build configuration list for PBXNativeTarget "ComputerFlow" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BCFG_DEBUG_TGT /* Debug */,
+				BCFG_RELEASE_TGT /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+	};
+	rootObject = PROJECT /* Project object */;
+}

@@ -1,0 +1,378 @@
+{
+  "builtTestProducts" : [
+
+  ],
+  "copyCommands" : {
+
+  },
+  "explicitTargetDependencyImportCheckingMode" : {
+    "none" : {
+
+    }
+  },
+  "generatedSourceTargetSet" : [
+
+  ],
+  "pluginDescriptions" : [
+
+  ],
+  "swiftCommands" : {
+    "C.ComputerFlow-release.module" : {
+      "executable" : "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "importPath" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/App/AppDelegate.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/App/AppState.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/App/ComputerFlowApp.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Compiling/CompilingWindow.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/MenuBar/MenuBarController.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/MenuBar/MenuBarView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Monitor/PipWindow.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Monitor/RunController.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Net/BackendClient.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Net/WorkflowStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Permissions/PermissionsView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Recording/EventTelemetry.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Recording/HotkeyManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Recording/RecordingPanel.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Recording/ScreenRecorder.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Recording/ScreenshotCapture.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Recording/VideoEncoder.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Theme.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Workflow/ScreenshotPanel.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Workflow/StepRow.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Workflow/WorkflowConfirmation.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Workflow/WorkflowEditor.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Workflow/WorkflowModel.swift"
+        }
+      ],
+      "isLibrary" : false,
+      "moduleName" : "ComputerFlow",
+      "moduleOutputPath" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.swiftmodule",
+      "objects" : [
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/App/AppDelegate.swift.o",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/App/AppState.swift.o",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/App/ComputerFlowApp.swift.o",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Compiling/CompilingWindow.swift.o",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/MenuBar/MenuBarController.swift.o",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/MenuBar/MenuBarView.swift.o",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Monitor/PipWindow.swift.o",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Monitor/RunController.swift.o",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Net/BackendClient.swift.o",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Net/WorkflowStore.swift.o",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Permissions/PermissionsView.swift.o",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Recording/EventTelemetry.swift.o",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Recording/HotkeyManager.swift.o",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Recording/RecordingPanel.swift.o",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Recording/ScreenRecorder.swift.o",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Recording/ScreenshotCapture.swift.o",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Recording/VideoEncoder.swift.o",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Theme.swift.o",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Workflow/ScreenshotPanel.swift.o",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Workflow/StepRow.swift.o",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Workflow/WorkflowConfirmation.swift.o",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Workflow/WorkflowEditor.swift.o",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Workflow/WorkflowModel.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-swift-version",
+        "5",
+        "-O",
+        "-g",
+        "-j11",
+        "-DSWIFT_PACKAGE",
+        "-module-cache-path",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ModuleCache",
+        "-parseable-output",
+        "-Xfrontend",
+        "-entry-point-function-name",
+        "-Xfrontend",
+        "ComputerFlow_main",
+        "-sdk",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-Xcc",
+        "-fPIC",
+        "-package-name",
+        "mac"
+      ],
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/App/AppDelegate.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/App/AppState.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/App/ComputerFlowApp.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Compiling/CompilingWindow.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/MenuBar/MenuBarController.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/MenuBar/MenuBarView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Monitor/PipWindow.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Monitor/RunController.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Net/BackendClient.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Net/WorkflowStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Permissions/PermissionsView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Recording/EventTelemetry.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Recording/HotkeyManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Recording/RecordingPanel.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Recording/ScreenRecorder.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Recording/ScreenshotCapture.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Recording/VideoEncoder.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Theme.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Workflow/ScreenshotPanel.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Workflow/StepRow.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Workflow/WorkflowConfirmation.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Workflow/WorkflowEditor.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build/Workflow/WorkflowModel.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.swiftmodule"
+        }
+      ],
+      "sources" : [
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/App/AppDelegate.swift",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/App/AppState.swift",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/App/ComputerFlowApp.swift",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Compiling/CompilingWindow.swift",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/MenuBar/MenuBarController.swift",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/MenuBar/MenuBarView.swift",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Monitor/PipWindow.swift",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Monitor/RunController.swift",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Net/BackendClient.swift",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Net/WorkflowStore.swift",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Permissions/PermissionsView.swift",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Recording/EventTelemetry.swift",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Recording/HotkeyManager.swift",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Recording/RecordingPanel.swift",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Recording/ScreenRecorder.swift",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Recording/ScreenshotCapture.swift",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Recording/VideoEncoder.swift",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Theme.swift",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Workflow/ScreenshotPanel.swift",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Workflow/StepRow.swift",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Workflow/WorkflowConfirmation.swift",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Workflow/WorkflowEditor.swift",
+        "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Workflow/WorkflowModel.swift"
+      ],
+      "tempsPath" : "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ComputerFlow.build",
+      "wholeModuleOptimization" : true
+    }
+  },
+  "swiftFrontendCommands" : {
+
+  },
+  "swiftTargetScanArgs" : {
+    "ComputerFlow" : [
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "-module-name",
+      "ComputerFlow",
+      "-package-name",
+      "mac",
+      "-whole-module-optimization",
+      "-num-threads",
+      "11",
+      "-c",
+      "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/App/AppDelegate.swift",
+      "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/App/AppState.swift",
+      "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/App/ComputerFlowApp.swift",
+      "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Compiling/CompilingWindow.swift",
+      "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/MenuBar/MenuBarController.swift",
+      "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/MenuBar/MenuBarView.swift",
+      "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Monitor/PipWindow.swift",
+      "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Monitor/RunController.swift",
+      "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Net/BackendClient.swift",
+      "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Net/WorkflowStore.swift",
+      "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Permissions/PermissionsView.swift",
+      "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Recording/EventTelemetry.swift",
+      "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Recording/HotkeyManager.swift",
+      "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Recording/RecordingPanel.swift",
+      "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Recording/ScreenRecorder.swift",
+      "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Recording/ScreenshotCapture.swift",
+      "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Recording/VideoEncoder.swift",
+      "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Theme.swift",
+      "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Workflow/ScreenshotPanel.swift",
+      "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Workflow/StepRow.swift",
+      "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Workflow/WorkflowConfirmation.swift",
+      "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Workflow/WorkflowEditor.swift",
+      "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/ComputerFlow/Workflow/WorkflowModel.swift",
+      "-I",
+      "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-swift-version",
+      "5",
+      "-O",
+      "-g",
+      "-j11",
+      "-DSWIFT_PACKAGE",
+      "-module-cache-path",
+      "/Users/lucas/Desktop/VibeCode/ComputerFlow/mac/.build/arm64-apple-macosx/release/ModuleCache",
+      "-parseable-output",
+      "-Xfrontend",
+      "-entry-point-function-name",
+      "-Xfrontend",
+      "ComputerFlow_main",
+      "-sdk",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-Xcc",
+      "-fPIC",
+      "-package-name",
+      "mac",
+      "-driver-use-frontend-path",
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc"
+    ]
+  },
+  "targetDependencyMap" : {
+    "ComputerFlow" : [
+
+    ]
+  },
+  "testDiscoveryCommands" : {
+
+  },
+  "testEntryPointCommands" : {
+
+  }
+}
