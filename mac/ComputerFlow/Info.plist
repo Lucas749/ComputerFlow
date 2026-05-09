@@ -20,9 +20,7 @@
 	<string>1</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
-	<key>LSUIElement</key>
-	<true/>
-	<key>NSAppleEventsUsageDescription</key>
+<key>NSAppleEventsUsageDescription</key>
 	<string>ComputerFlow needs to send Apple Events to automate workflows.</string>
 	<key>NSScreenCaptureUsageDescription</key>
 	<string>ComputerFlow records your screen to build automation workflows.</string>

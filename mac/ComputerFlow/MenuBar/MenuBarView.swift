@@ -89,22 +89,21 @@ struct MenuBarView: View {
             // ── Footer ───────────────────────────────────────────
             Divider().opacity(0.07)
 
-            HStack {
-                footerButton("Settings") { openSettings() }
+            HStack(spacing: 8) {
+                footerIconButton(icon: "accessibility", tooltip: "Accessibility") { openAccessibility() }
+                footerIconButton(icon: "rectangle.dashed.badge.record", tooltip: "Screen Recording") { openScreenRecording() }
+                footerIconButton(icon: appState.isDarkMode ? "sun.min" : "moon", tooltip: appState.isDarkMode ? "Light mode" : "Dark mode") {
+                    appState.isDarkMode.toggle()
+                }
                 Spacer()
-                // Dark / light toggle
-                Button(action: { appState.isDarkMode.toggle() }) {
-                    Image(systemName: appState.isDarkMode ? "sun.min" : "moon")
-                        .font(.system(size: 12))
+                Button(action: { NSApplication.shared.terminate(nil) }) {
+                    Text("Quit")
+                        .font(.system(size: 11.5))
                         .foregroundColor(Theme.t3)
-                        .frame(width: 24, height: 24)
-                        .background(Theme.ctrl)
-                        .cornerRadius(6)
-                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.bdiv, lineWidth: 1))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
                 }
                 .buttonStyle(PlainButtonStyle())
-                Spacer()
-                footerButton("Quit") { NSApplication.shared.terminate(nil) }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
@@ -145,12 +144,27 @@ struct MenuBarView: View {
     @ViewBuilder
     var recentSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Recent")
-                .font(.system(size: 12.5))
-                .foregroundColor(Theme.t3)
-                .padding(.horizontal, 12)
-                .padding(.bottom, 5)
-                .padding(.top, 2)
+            HStack {
+                Text("Recent")
+                    .font(.system(size: 12.5))
+                    .foregroundColor(Theme.t3)
+                Spacer()
+                if !store.recentWorkflows.isEmpty {
+                    Button(action: { openAllWorkflows() }) {
+                        HStack(spacing: 3) {
+                            Text("All")
+                                .font(.system(size: 11))
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 9, weight: .semibold))
+                        }
+                        .foregroundColor(Theme.t3)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 5)
+            .padding(.top, 2)
 
             if store.recentWorkflows.isEmpty {
                 Text("No workflows yet")
@@ -167,7 +181,11 @@ struct MenuBarView: View {
         .padding(.bottom, 2)
     }
 
-    // MARK: - Footer button
+    func openAllWorkflows() {
+        WorkflowLibraryWindowController.shared.show()
+    }
+
+    // MARK: - Footer helpers
     func footerButton(_ label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(label)
@@ -180,8 +198,26 @@ struct MenuBarView: View {
         .contentShape(Rectangle())
     }
 
-    func openSettings() {
-        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:")!)
+    func footerIconButton(icon: String, tooltip: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 13))
+                .foregroundColor(Theme.t3)
+                .frame(width: 26, height: 26)
+                .background(Theme.ctrl)
+                .cornerRadius(6)
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.bdiv, lineWidth: 1))
+        }
+        .buttonStyle(PlainButtonStyle())
+        .help(tooltip)
+    }
+
+    func openAccessibility() {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+    }
+
+    func openScreenRecording() {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!)
     }
 }
 
@@ -243,7 +279,11 @@ struct RecentWorkflowRow: View {
         .padding(.horizontal, 12)
         .onHover { isHovered = $0 }
         .contentShape(Rectangle())
-        .onTapGesture { appState.openEditor(workflow: workflow) }
+        .onTapGesture {
+            let controller = WorkflowConfirmationWindowController(workflow: workflow)
+            appState.confirmationWindowController = controller
+            controller.show()
+        }
     }
 
     func relativeDate(_ date: Date) -> String {

@@ -69,8 +69,8 @@ class BackendClient {
         try checkResponse(response)
 
         let json = try JSONDecoder().decode([String: String].self, from: data)
-        guard let workflowId = json["workflow_id"] else {
-            throw BackendError.missingField("workflow_id")
+        guard let workflowId = json["id"] ?? json["workflow_id"] else {
+            throw BackendError.missingField("id")
         }
         return workflowId
     }
@@ -119,8 +119,28 @@ class BackendClient {
         let (data, response) = try await URLSession.shared.data(from: url)
         try checkResponse(response)
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = .custom { dec in
+            let str = try dec.singleValueContainer().decode(String.self)
+            return Self.flexibleISO8601(str) ?? Date()
+        }
         return try decoder.decode(WorkflowModel.self, from: data)
+    }
+
+    /// Handle ISO8601 with or without fractional seconds (backend sends microseconds).
+    private static func flexibleISO8601(_ s: String) -> Date? {
+        let withFrac = ISO8601DateFormatter()
+        withFrac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = withFrac.date(from: s) { return d }
+        let plain = ISO8601DateFormatter()
+        plain.formatOptions = [.withInternetDateTime]
+        if let d = plain.date(from: s) { return d }
+        // Fallback: strip fractional seconds manually
+        if let dotIdx = s.firstIndex(of: "."),
+           let tzIdx = s[dotIdx...].firstIndex(where: { $0 == "+" || $0 == "-" || $0 == "Z" }) {
+            let stripped = String(s[..<dotIdx]) + String(s[tzIdx...])
+            return plain.date(from: stripped)
+        }
+        return nil
     }
 
     // MARK: - Update Workflow

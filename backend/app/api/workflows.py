@@ -16,7 +16,7 @@ from typing import Optional
 
 import aiofiles
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session  # noqa: F401 — used by get_db dependency
 
@@ -111,6 +111,19 @@ async def get_workflow(workflow_id: str, db: Session = Depends(get_db)):
     return data
 
 
+# ── Workflow screenshot ───────────────────────────────────────────────────────
+
+@router.get("/workflows/{workflow_id}/screenshot/{filename}")
+async def get_workflow_screenshot(workflow_id: str, filename: str):
+    """Serve a per-event screenshot for a workflow (used by the review window)."""
+    if "/" in filename or ".." in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    path = event_screenshots_dir(workflow_id) / filename
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Screenshot not found")
+    return FileResponse(path, media_type="image/jpeg")
+
+
 # ── Update workflow ───────────────────────────────────────────────────────────
 
 class WorkflowUpdateBody(BaseModel):
@@ -200,7 +213,13 @@ async def _run_compile(workflow_id: str, name: str) -> None:
             ),
         )
 
+        from app.store import workflow_json_path
+        import logging, os
         store.update_workflow_json(workflow_id, workflow_json)
+        saved_path = workflow_json_path(workflow_id).resolve()
+        logging.getLogger("uvicorn.error").info(
+            f"[ComputerFlow] workflow.json saved → {saved_path}"
+        )
         await emit(3, 100, "Complete", workflowId=workflow_id)
 
     except Exception as exc:

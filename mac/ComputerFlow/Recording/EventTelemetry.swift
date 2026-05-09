@@ -29,6 +29,9 @@ class EventTelemetry: ObservableObject {
     private(set) var rootDir: URL?
     private(set) var screenshotsDir: URL?
     private var captureDisplayID: CGDirectDisplayID?
+    private var lastKeyTimestamp: TimeInterval = 0
+    private var burstScreenshotPath: String = ""
+    private static let keyBurstThresholdMs: TimeInterval = 600  // ms between keystrokes to count as same word
 
     private let captureQueue = DispatchQueue(
         label: "computerflow.screenshot-capture",
@@ -42,6 +45,8 @@ class EventTelemetry: ObservableObject {
     func start(recordingID: String, displayID: CGDirectDisplayID? = nil) throws {
         events = []
         captureDisplayID = displayID
+        lastKeyTimestamp = 0
+        burstScreenshotPath = ""
 
         let appSupport = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -112,11 +117,22 @@ class EventTelemetry: ObservableObject {
 
     private func handleKey(_ event: NSEvent) {
         let idx = events.count
-        let screenshotRelPath = captureBefore(index: idx)
+        let now = Date().timeIntervalSince1970 * 1000
+
+        // Only capture a new screenshot if this key starts a fresh burst
+        let inBurst = (now - lastKeyTimestamp) < EventTelemetry.keyBurstThresholdMs
+        let screenshotRelPath: String
+        if inBurst {
+            screenshotRelPath = burstScreenshotPath  // reuse first-key screenshot
+        } else {
+            screenshotRelPath = captureBefore(index: idx)
+            burstScreenshotPath = screenshotRelPath
+        }
+        lastKeyTimestamp = now
 
         let entry: [String: Any] = [
             "i": idx,
-            "t": Date().timeIntervalSince1970 * 1000,
+            "t": now,
             "kind": "key",
             "key": event.charactersIgnoringModifiers ?? "",
             "keyCode": event.keyCode,

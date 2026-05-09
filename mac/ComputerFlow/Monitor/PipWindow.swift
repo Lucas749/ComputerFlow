@@ -12,12 +12,12 @@ class PipWindowController {
     }
 
     @MainActor func show() {
-        let runController = RunController(runId: runResult.runId)
+        let runController = RunController(runId: runResult.runId, liveViewUrl: runResult.liveViewUrl)
         let view = PipView(runResult: runResult, runController: runController)
         let hosting = NSHostingView(rootView: view)
 
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 460, height: 259),
+            contentRect: NSRect(x: 0, y: 0, width: 520, height: 330),
             styleMask: [.nonactivatingPanel, .borderless],
             backing: .buffered,
             defer: false
@@ -28,11 +28,11 @@ class PipWindowController {
         panel.hasShadow = true
         panel.isMovableByWindowBackground = true
         panel.contentView = hosting
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
-        // Position bottom-right
         if let screen = NSScreen.main {
             let sf = screen.visibleFrame
-            let x = sf.maxX - 460 - 20
+            let x = sf.maxX - 520 - 20
             let y = sf.minY + 20
             panel.setFrameOrigin(NSPoint(x: x, y: y))
         }
@@ -49,7 +49,7 @@ class PipWindowController {
     }
 }
 
-// MARK: - PipView (Screen 5)
+// MARK: - PipView
 struct PipView: View {
     let runResult: RunResult
     @StateObject var runController: RunController
@@ -57,18 +57,12 @@ struct PipView: View {
 
     var body: some View {
         ZStack {
-            // WebView background
-            if let urlStr = runResult.liveViewUrl, let url = URL(string: urlStr) {
-                WebViewContainer(url: url)
-                    .cornerRadius(12)
-            } else {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(red: 10/255, green: 10/255, blue: 14/255))
-            }
+            // Background — kernel webview or desktop screenshot
+            liveArea
+                .cornerRadius(12)
 
-            // Overlay
+            // Top overlay
             VStack {
-                // Top row
                 HStack {
                     agentActiveBadge
                     Spacer()
@@ -79,33 +73,66 @@ struct PipView: View {
 
                 Spacer()
 
-                // Log lines
+                // Log lines at the bottom
                 logLinesView
                     .padding(.horizontal, 10)
                     .padding(.bottom, 10)
             }
 
-            // Hover overlay
             if isHovering {
                 hoverOverlay
             }
         }
-        .frame(width: 460, height: 259)
+        .frame(width: 520, height: 330)
         .cornerRadius(12)
         .shadow(color: .black.opacity(0.6), radius: 20, x: 0, y: 10)
         .onHover { isHovering = $0 }
     }
 
-    // MARK: - Agent Active Badge
+    // MARK: - Live area
+    @ViewBuilder
+    var liveArea: some View {
+        if runController.isBrowserRun {
+            if let urlStr = runController.liveViewUrl, let url = URL(string: urlStr) {
+                KernelWebView(url: url)
+            } else {
+                waitingPlaceholder("Waiting for browser session…")
+            }
+        } else {
+            if let img = runController.currentScreenshot {
+                Image(nsImage: img)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } else {
+                waitingPlaceholder("Waiting for agent screenshots…")
+            }
+        }
+    }
+
+    func waitingPlaceholder(_ msg: String) -> some View {
+        ZStack {
+            Color(red: 10/255, green: 10/255, blue: 14/255)
+            VStack(spacing: 10) {
+                ProgressView()
+                    .scaleEffect(0.9)
+                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                Text(msg)
+                    .font(.system(size: 11))
+                    .foregroundColor(.white.opacity(0.55))
+            }
+        }
+    }
+
+    // MARK: - Badges
     var agentActiveBadge: some View {
         HStack(spacing: 5) {
             Circle()
                 .fill(Theme.grn)
                 .frame(width: 7, height: 7)
                 .modifier(RecBlinkModifier())
-            Text("Agent Active")
+            Text(runController.isBrowserRun ? "Browser Agent" : "Desktop Agent")
                 .font(.system(size: 11, weight: .medium))
-                .foregroundColor(Theme.t1)
+                .foregroundColor(.white)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 5)
@@ -114,60 +141,66 @@ struct PipView: View {
         .clipShape(Capsule())
     }
 
-    // MARK: - Step Counter
     var stepCounterBadge: some View {
-        Text("Step \(runController.stepIndex)/\(runController.totalSteps)")
-            .font(Theme.mono(11))
-            .foregroundColor(Theme.t1)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(Color.black.opacity(0.6))
-            .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 1))
-            .clipShape(Capsule())
+        Group {
+            if runController.totalSteps > 0 {
+                Text("Step \(runController.stepIndex)/\(runController.totalSteps)")
+            } else {
+                Text("Starting…")
+            }
+        }
+        .font(.system(size: 11, weight: .medium).monospacedDigit())
+        .foregroundColor(.white)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(Color.black.opacity(0.6))
+        .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 1))
+        .clipShape(Capsule())
     }
 
-    // MARK: - Log Lines
     var logLinesView: some View {
         VStack(alignment: .leading, spacing: 2) {
             let lines = runController.logLines.suffix(3)
             let arr = Array(lines)
             ForEach(0..<arr.count, id: \.self) { i in
                 Text(arr[i])
-                    .font(Theme.mono(10))
-                    .foregroundColor(i == arr.count - 1 ? Color.white.opacity(0.72) : Color.white.opacity(0.25))
+                    .font(.system(size: 10).monospaced())
+                    .foregroundColor(i == arr.count - 1 ? Color.white.opacity(0.85) : Color.white.opacity(0.35))
                     .lineLimit(1)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(Color.black.opacity(0.4))
+        .cornerRadius(6)
     }
 
-    // MARK: - Hover Overlay
+    // MARK: - Hover overlay
     var hoverOverlay: some View {
         ZStack {
-            Color.black.opacity(0.46)
+            Color.black.opacity(0.5)
 
             HStack(spacing: 14) {
-                // Pause
                 pipControlButton(icon: "pause.fill", label: "Pause") {
                     runController.pause()
                 }
-
-                // Stop
                 pipControlButton(icon: "stop.fill", label: "Stop") {
                     runController.stop()
                 }
-
-                // Take Control
-                Button(action: { runController.takeControl() }) {
-                    Text("Take Control")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.black)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Color.white)
-                        .cornerRadius(8)
+                // Take Control — kernel/browser runs only
+                if runController.isBrowserRun {
+                    Button(action: { runController.takeControl() }) {
+                        Text("Take Control")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(Color.white)
+                            .cornerRadius(8)
+                    }
+                    .buttonStyle(PlainButtonStyle())
                 }
-                .buttonStyle(PlainButtonStyle())
             }
         }
         .cornerRadius(12)
@@ -178,29 +211,35 @@ struct PipView: View {
             VStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: 18))
-                    .foregroundColor(Theme.t1)
+                    .foregroundColor(.white)
                 Text(label)
                     .font(.system(size: 10))
-                    .foregroundColor(Theme.t2)
+                    .foregroundColor(.white.opacity(0.7))
             }
             .frame(width: 52, height: 52)
-            .background(Color.white.opacity(0.1))
+            .background(Color.white.opacity(0.12))
             .cornerRadius(10)
         }
         .buttonStyle(PlainButtonStyle())
     }
 }
 
-// MARK: - WebViewContainer
-struct WebViewContainer: NSViewRepresentable {
+// MARK: - KernelWebView
+struct KernelWebView: NSViewRepresentable {
     let url: URL
 
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
+        config.mediaTypesRequiringUserActionForPlayback = []
         let webView = WKWebView(frame: .zero, configuration: config)
+        webView.allowsMagnification = true
         webView.load(URLRequest(url: url))
         return webView
     }
 
-    func updateNSView(_ webView: WKWebView, context: Context) {}
+    func updateNSView(_ webView: WKWebView, context: Context) {
+        if webView.url != url {
+            webView.load(URLRequest(url: url))
+        }
+    }
 }

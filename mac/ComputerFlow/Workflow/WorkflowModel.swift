@@ -147,10 +147,29 @@ struct WorkflowVariable: Codable, Identifiable {
 }
 
 // MARK: - CompileEvent
+// stage can be an Int (0-3) or the string "error" from the backend
 struct CompileEvent: Codable {
-    var stage: Int
+    var stage: Int        // "error" decodes as -1
     var progress: Double
     var subline: String
+    var error: Bool?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        // stage may be Int or String "error"
+        if let i = try? c.decode(Int.self, forKey: .stage) {
+            stage = i
+        } else {
+            stage = -1
+        }
+        progress = (try? c.decode(Double.self, forKey: .progress)) ?? 0
+        subline  = (try? c.decode(String.self, forKey: .subline))  ?? ""
+        error    = try? c.decode(Bool.self, forKey: .error)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case stage, progress, subline, error
+    }
 }
 
 // MARK: - RunResult
@@ -158,14 +177,40 @@ struct RunResult: Codable {
     var runId: String
     var liveViewUrl: String?
     var status: String
+
+    enum CodingKeys: String, CodingKey {
+        case runId, liveViewUrl, status
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        runId = try c.decode(String.self, forKey: .runId)
+        liveViewUrl = try? c.decode(String.self, forKey: .liveViewUrl)
+        status = (try? c.decode(String.self, forKey: .status)) ?? "pending"
+    }
 }
 
 // MARK: - RunEvent
+// Event shapes emitted by backend WS /runs/{id}/stream:
+//   {"type":"run_started","runId":"..."}
+//   {"type":"live_view","urls":{"kernel_browser":"https://...","lightcone_os":"..."}}
+//   {"type":"step","stepIndex":0,"totalSteps":4,"intent":"click button","environment":"browser"}
+//   {"type":"action","action":"click","environment":"desktop"}
+//   {"type":"screenshot","b64":"...","environment":"desktop"}
+//   {"type":"run_finished","status":"completed","answer":"..."}
 struct RunEvent: Codable {
+    var type: String?
+    var runId: String?
+    var urls: [String: String]?
     var stepIndex: Int?
     var totalSteps: Int?
-    var logLine: String?
+    var intent: String?
+    var action: String?
+    var environment: String?
+    var b64: String?
     var status: String?
+    var answer: String?
+    var error: String?
 }
 
 // MARK: - DynKey helper

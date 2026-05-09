@@ -29,7 +29,7 @@ import asyncio
 import base64
 import os
 from dataclasses import dataclass, field
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Callable, Protocol, runtime_checkable
 
 from app.infra.types import (
     ActionType,
@@ -314,6 +314,7 @@ async def _run_cua_loop(
     shots_dir: str | None = None,   # if set, every frame is written to disk as captured
     shots_label: str = "session",   # filename prefix
     shots_step: int = 0,            # step index for filename
+    on_event: "Callable[[dict], None] | None" = None,  # optional: called per action/screenshot
 ) -> tuple[str, int, list[Any]]:
     """
     Core CUA protocol loop — identical for all three backends.
@@ -356,6 +357,11 @@ async def _run_cua_loop(
         action = computer_call.action
         action_type = getattr(action, "type", "unknown")
         events.append({"action": action_type})
+        if on_event:
+            try:
+                on_event({"type": "action", "action": action_type, "environment": environment})
+            except Exception:
+                pass
 
         if action_type in ("terminate", "done", "answer"):
             answer = (
@@ -377,6 +383,12 @@ async def _run_cua_loop(
             # use list length as frame index so CUA frames slot in among poller frames
             fi = (len(screenshots) - 1) if screenshots is not None else actions_taken
             _save_frame(b64, shots_dir, shots_label, shots_step, fi)
+        if on_event and b64 and environment != "browser":
+            # Emit screenshots only for desktop (CUA) runs — browser has live view URL instead
+            try:
+                on_event({"type": "screenshot", "b64": b64, "environment": environment})
+            except Exception:
+                pass
 
         mime = "image/jpeg" if b64.startswith("/9j/") else "image/png"
         response = await lc_sdk.responses.create(
@@ -448,7 +460,7 @@ class ComputerFlowRunner:
 
     # ── Primary entry point ───────────────────────────────────────────────────
 
-    async def run_flow(self, flow: FlowRequest) -> FlowResult:
+    async def run_flow(self, flow: FlowRequest, on_event: "Callable[[dict], None] | None" = None) -> FlowResult:
         """
         Execute a full flow, handling target routing and handoffs automatically.
 
@@ -457,17 +469,22 @@ class ComputerFlowRunner:
         the previous session stays open so it can receive future steps if the
         flow toggles back.
 
+        If on_event is provided, it's called with:
+          {"type": "live_view", "urls": {...}}  — as soon as URLs are known
+          {"type": "action", "action": "click", ...} — per CUA action
+          {"type": "screenshot", "b64": "...", "environment": "desktop"} — CUA frames
+
         Returns a FlowResult with answer, step count, and live_view_urls for
         every surface used (frontend surfaces these to the user).
         """
         try:
-            return await self._execute_flow(flow)
+            return await self._execute_flow(flow, on_event=on_event)
         except Exception as exc:
             return FlowResult(answer="", steps_taken=0, ok=False, error=str(exc))
 
     # ── Flow execution ────────────────────────────────────────────────────────
 
-    async def _execute_flow(self, flow: FlowRequest) -> FlowResult:
+    async def _execute_flow(self, flow: FlowRequest, on_event: "Callable[[dict], None] | None" = None) -> FlowResult:
         opts = flow.options
         live_view_urls: dict[str, str] = {}
         all_events: list[Any] = []
@@ -535,6 +552,11 @@ class ComputerFlowRunner:
                         url = getattr(sess, "browser_live_view_url", None) or ""
                         if url:
                             live_view_urls["kernel_browser"] = url
+                            if on_event:
+                                try:
+                                    on_event({"type": "live_view", "urls": dict(live_view_urls)})
+                                except Exception:
+                                    pass
                         print(f"[kernel] browser {kernel_session_id} (live: {url})")
                         if url and self._open_live_views:
                             import subprocess as _sp
@@ -566,6 +588,7 @@ class ComputerFlowRunner:
                         lc_sdk, backend, flow, group_steps, opts,
                         environment="browser",
                         session_label=f"kernel_{kernel_session_id[-8:]}",
+                        on_event=on_event,
                     )
 
                 elif group_target == RunTarget.LIGHTCONE_OS:
@@ -583,6 +606,11 @@ class ComputerFlowRunner:
                         debug_path = endpoints.get("debug")
                         if debug_path:
                             live_view_urls["lightcone_os"] = f"https://api.tzafon.ai{debug_path}"
+                            if on_event:
+                                try:
+                                    on_event({"type": "live_view", "urls": dict(live_view_urls)})
+                                except Exception:
+                                    pass
                         lc_live = live_view_urls.get("lightcone_os", "")
                         print(f"[lightcone] computer {lightcone_computer_id} (live: {lc_live})")
                         if lc_live and self._open_live_views:
@@ -595,6 +623,7 @@ class ComputerFlowRunner:
                         lc_sdk, backend, flow, group_steps, opts,
                         environment="desktop",
                         session_label=f"lightcone_{lightcone_computer_id[-8:]}",
+                        on_event=on_event,
                     )
 
                 elif group_target == RunTarget.LOCAL:
@@ -605,6 +634,7 @@ class ComputerFlowRunner:
                         lc_sdk, backend, flow, group_steps, opts,
                         environment="desktop",
                         session_label="local",
+                        on_event=on_event,
                     )
                 else:
                     raise ValueError(f"Unhandled target: {group_target!r}")
@@ -681,6 +711,7 @@ class ComputerFlowRunner:
         opts: RunOptions,
         environment: str,
         session_label: str = "",
+        on_event: "Callable[[dict], None] | None" = None,
     ) -> tuple[str, int, list[Any]]:
         """
         Run a group of steps via the CUA loop on a given backend.
@@ -702,6 +733,17 @@ class ComputerFlowRunner:
 
         for step_i, step in enumerate(steps):
             print(f"  [cua] {step.intent[:80]}")
+            if on_event:
+                try:
+                    on_event({
+                        "type": "step",
+                        "stepIndex": step_i,
+                        "totalSteps": len(steps),
+                        "intent": step.intent,
+                        "environment": environment,
+                    })
+                except Exception:
+                    pass
 
             if (
                 environment == "browser"
@@ -730,6 +772,11 @@ class ComputerFlowRunner:
             # Seed list and save initial frame immediately
             step_shots: list[str] = [live_b64]
             _save_frame(live_b64, shots_dir, label, step_i, 0)
+            if on_event and live_b64 and environment != "browser":
+                try:
+                    on_event({"type": "screenshot", "b64": live_b64, "environment": environment})
+                except Exception:
+                    pass
 
             # For Lightcone OS: background poller captures frames every 3s during
             # slow operations (app launch, installs) between CUA actions.
@@ -766,6 +813,7 @@ class ComputerFlowRunner:
                     shots_dir=shots_dir,
                     shots_label=label,
                     shots_step=step_i,
+                    on_event=on_event,
                 )
             finally:
                 if poller_task:

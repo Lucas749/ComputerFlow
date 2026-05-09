@@ -36,15 +36,17 @@ class WorkflowStore: ObservableObject {
     }
 
     func addOrUpdate(_ workflow: WorkflowModel) {
-        if let idx = recentWorkflows.firstIndex(where: { $0.id == workflow.id }) {
-            recentWorkflows[idx] = workflow
-        } else {
-            recentWorkflows.insert(workflow, at: 0)
-            if recentWorkflows.count > 20 {
-                recentWorkflows = Array(recentWorkflows.prefix(20))
+        DispatchQueue.main.async {
+            if let idx = self.recentWorkflows.firstIndex(where: { $0.id == workflow.id }) {
+                self.recentWorkflows[idx] = workflow
+            } else {
+                self.recentWorkflows.insert(workflow, at: 0)
+                if self.recentWorkflows.count > 20 {
+                    self.recentWorkflows = Array(self.recentWorkflows.prefix(20))
+                }
             }
+            self.save()
         }
-        save()
     }
 
     func remove(id: String) {

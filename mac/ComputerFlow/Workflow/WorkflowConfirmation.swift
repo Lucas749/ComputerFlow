@@ -17,7 +17,7 @@ class WorkflowConfirmationWindowController {
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 900, height: 580),
-            styleMask: [.titled, .closable, .fullSizeContentView],
+            styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
@@ -29,9 +29,10 @@ class WorkflowConfirmationWindowController {
         window.contentView = hosting
         window.center()
         window.isReleasedWhenClosed = false
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
         self.window = window
+
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
     }
 
     func close() {
@@ -46,6 +47,7 @@ struct RecordingReviewView: View {
     let store: WorkflowStore
     @State private var selectedStepId: String?
     @State private var saved = false
+    @State private var editingStepId: String?
 
     var selectedStep: WorkflowStep? {
         workflow.steps.first { $0.id == selectedStepId }
@@ -128,11 +130,27 @@ struct RecordingReviewView: View {
                         ReviewStepRow(
                             step: step,
                             isSelected: selectedStepId == step.id,
-                            workflowDir: workflowDataDir()
+                            workflowId: workflow.id
                         ) {
                             selectedStepId = step.id
                         }
                     }
+
+                    Button(action: addStep) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus.circle")
+                            Text("Add step")
+                        }
+                        .font(.system(size: 11.5))
+                        .foregroundColor(Theme.t3)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 7)
+                        .background(Theme.ctrl.opacity(0.4))
+                        .cornerRadius(6)
+                        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [3])).foregroundColor(Theme.bdiv))
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .padding(.top, 6)
                 }
                 .padding(.horizontal, 8)
                 .padding(.bottom, 12)
@@ -147,8 +165,8 @@ struct RecordingReviewView: View {
     var detailPane: some View {
         if let step = selectedStep {
             ReviewDetailPane(
-                step: step,
-                workflowDir: workflowDataDir(),
+                step: binding(for: step),
+                workflowId: workflow.id,
                 onApprove: { approveStep(step) },
                 onRemove: { removeStep(step) }
             )
@@ -222,6 +240,32 @@ struct RecordingReviewView: View {
     }
 
     // MARK: - Actions
+    func binding(for step: WorkflowStep) -> Binding<WorkflowStep> {
+        guard let idx = workflow.steps.firstIndex(where: { $0.id == step.id }) else {
+            return .constant(step)
+        }
+        return $workflow.steps[idx]
+    }
+
+    func addStep() {
+        let newId = "s\(workflow.steps.count + 1)_\(Int(Date().timeIntervalSince1970))"
+        let newStep = WorkflowStep(
+            id: newId,
+            n: workflow.steps.count + 1,
+            action: "click",
+            intent: "New step",
+            target: StepTarget(kind: "description", description: "", selector: nil, url: nil),
+            value: nil,
+            executor: StepExecutor(kind: "computer_use", entryFn: "desktop_agent.execute_step"),
+            screenshot: nil,
+            approved: false,
+            needsReview: true,
+            notes: ""
+        )
+        workflow.steps.append(newStep)
+        selectedStepId = newId
+    }
+
     func approveStep(_ step: WorkflowStep) {
         guard let idx = workflow.steps.firstIndex(where: { $0.id == step.id }) else { return }
         workflow.steps[idx].approved = true
@@ -272,18 +316,13 @@ struct RecordingReviewView: View {
         }
     }
 
-    // Base path where the backend stores screenshots for this workflow
-    func workflowDataDir() -> URL? {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return appSupport.appendingPathComponent("ComputerFlow/tmp", isDirectory: true)
-    }
 }
 
 // MARK: - ReviewStepRow
 struct ReviewStepRow: View {
     let step: WorkflowStep
     let isSelected: Bool
-    let workflowDir: URL?
+    let workflowId: String
     let onTap: () -> Void
 
     var body: some View {
@@ -321,11 +360,7 @@ struct ReviewStepRow: View {
 
     @ViewBuilder
     var thumbnailView: some View {
-        if let img = loadThumbnail() {
-            Image(nsImage: img)
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-        } else {
+        WorkflowScreenshotView(workflowId: workflowId, screenshotRel: step.screenshot) {
             LinearGradient(
                 colors: stepColors,
                 startPoint: .topLeading, endPoint: .bottomTrailing
@@ -344,23 +379,6 @@ struct ReviewStepRow: View {
         return palette[step.n % palette.count]
     }
 
-    func loadThumbnail() -> NSImage? {
-        guard let rel = step.screenshot, !rel.isEmpty else { return nil }
-        // step.screenshot is like "screenshots/ev_0000.jpg" — look in tmp recording dirs
-        guard let base = workflowDir else { return nil }
-        // Search all recording dirs for this screenshot file
-        let name = URL(fileURLWithPath: rel).lastPathComponent
-        if let dirs = try? FileManager.default.contentsOfDirectory(at: base, includingPropertiesForKeys: nil) {
-            for dir in dirs {
-                let candidate = dir.appendingPathComponent("screenshots").appendingPathComponent(name)
-                if FileManager.default.fileExists(atPath: candidate.path),
-                   let img = NSImage(contentsOf: candidate) {
-                    return img
-                }
-            }
-        }
-        return nil
-    }
 
     @ViewBuilder
     var statusDot: some View {
@@ -376,47 +394,63 @@ struct ReviewStepRow: View {
 
 // MARK: - ReviewDetailPane
 struct ReviewDetailPane: View {
-    let step: WorkflowStep
-    let workflowDir: URL?
+    @Binding var step: WorkflowStep
+    let workflowId: String
     let onApprove: () -> Void
     let onRemove: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Step header
-            HStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill(Theme.surf)
-                        .overlay(Circle().stroke(Theme.bdiv, lineWidth: 1))
-                        .frame(width: 28, height: 28)
-                    Text("\(step.n)")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(Theme.t2)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                // Step header
+                HStack(spacing: 10) {
+                    ZStack {
+                        Circle()
+                            .fill(Theme.surf)
+                            .overlay(Circle().stroke(Theme.bdiv, lineWidth: 1))
+                            .frame(width: 28, height: 28)
+                        Text("\(step.n)")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(Theme.t2)
+                    }
+                    VStack(alignment: .leading, spacing: 1) {
+                        HStack(spacing: 8) {
+                            Text(step.actionLabel)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(Theme.t1)
+                            executorBadge
+                            if step.needsReview {
+                                needsReviewBadge
+                            }
+                        }
+                        Text(step.displayIntent)
+                            .font(.system(size: 12))
+                            .foregroundColor(Theme.t2)
+                            .lineLimit(2)
+                    }
+                    Spacer()
                 }
-                VStack(alignment: .leading, spacing: 1) {
-                    HStack(spacing: 8) {
-                        Text(step.actionLabel)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(Theme.t1)
-                        executorBadge
-                        if step.needsReview {
-                            needsReviewBadge
+                .padding(.horizontal, 22)
+                .padding(.top, 20)
+                .padding(.bottom, 14)
+
+                // Screenshot (loaded from backend by workflow id + relative path)
+                WorkflowScreenshotView(workflowId: workflowId, screenshotRel: step.screenshot) {
+                    ZStack {
+                        LinearGradient(
+                            colors: [Color(hex: "#0d1117"), Color(hex: "#161b22")],
+                            startPoint: .topLeading, endPoint: .bottomTrailing
+                        )
+                        VStack(spacing: 8) {
+                            Image(systemName: "photo")
+                                .font(.system(size: 28))
+                                .foregroundColor(Color.white.opacity(0.2))
+                            Text("No screenshot")
+                                .font(.system(size: 12))
+                                .foregroundColor(Color.white.opacity(0.2))
                         }
                     }
-                    Text(step.displayIntent)
-                        .font(.system(size: 12))
-                        .foregroundColor(Theme.t2)
-                        .lineLimit(2)
                 }
-                Spacer()
-            }
-            .padding(.horizontal, 22)
-            .padding(.top, 20)
-            .padding(.bottom, 14)
-
-            // Screenshot
-            screenshotView
                 .frame(maxWidth: .infinity)
                 .frame(height: 280)
                 .cornerRadius(10)
@@ -424,45 +458,12 @@ struct ReviewDetailPane: View {
                 .padding(.horizontal, 22)
                 .padding(.bottom, 16)
 
-            // Target description
-            if let desc = step.target.description, !desc.isEmpty {
-                HStack(alignment: .top, spacing: 8) {
-                    Text("Target")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(Theme.t3)
-                        .frame(width: 48, alignment: .leading)
-                    Text(desc)
-                        .font(Theme.mono(11))
-                        .foregroundColor(Theme.t2)
-                        .lineLimit(3)
-                }
-                .padding(.horizontal, 22)
-                .padding(.bottom, 12)
-            }
+                // Editable fields
+                editForm
 
-            // Value chip
-            if let val = step.value {
-                HStack(spacing: 8) {
-                    Text("Value")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(Theme.t3)
-                        .frame(width: 48, alignment: .leading)
-                    Text(val.displayString)
-                        .font(Theme.mono(11))
-                        .foregroundColor(val.isVariable ? Theme.blue : Theme.t1)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(val.isVariable ? Theme.blue.opacity(0.12) : Theme.surf)
-                        .cornerRadius(5)
-                }
-                .padding(.horizontal, 22)
-                .padding(.bottom, 12)
-            }
+                Spacer(minLength: 12)
 
-            Spacer()
-
-            // Approve button
-            HStack(spacing: 10) {
+                // Approve button
                 Button(action: onApprove) {
                     HStack(spacing: 6) {
                         Image(systemName: step.approved ? "checkmark.circle.fill" : "checkmark.circle")
@@ -477,35 +478,97 @@ struct ReviewDetailPane: View {
                     .cornerRadius(8)
                 }
                 .buttonStyle(PlainButtonStyle())
+                .padding(.horizontal, 22)
+                .padding(.bottom, 16)
             }
-            .padding(.horizontal, 22)
-            .padding(.bottom, 16)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    // MARK: - Editable form
     @ViewBuilder
-    var screenshotView: some View {
-        if let img = loadScreenshot() {
-            Image(nsImage: img)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .background(Color.black)
-        } else {
-            ZStack {
-                LinearGradient(
-                    colors: [Color(hex: "#0d1117"), Color(hex: "#161b22")],
-                    startPoint: .topLeading, endPoint: .bottomTrailing
-                )
-                VStack(spacing: 8) {
-                    Image(systemName: "photo")
-                        .font(.system(size: 28))
-                        .foregroundColor(Color.white.opacity(0.2))
-                    Text("No screenshot")
-                        .font(.system(size: 12))
-                        .foregroundColor(Color.white.opacity(0.2))
-                }
+    var editForm: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            editRow(label: "Intent") {
+                TextField("What the user is doing", text: Binding(
+                    get: { step.intent ?? "" },
+                    set: { step.intent = $0 }
+                ))
+                .textFieldStyle(.plain)
+                .font(.system(size: 12))
+                .foregroundColor(Theme.t1)
+                .padding(.horizontal, 8).padding(.vertical, 5)
+                .background(Theme.ctrl)
+                .cornerRadius(5)
+                .overlay(RoundedRectangle(cornerRadius: 5).stroke(Theme.bdiv, lineWidth: 1))
             }
+
+            editRow(label: "Action") {
+                Picker("", selection: $step.action) {
+                    ForEach(["click", "double_click", "right_click", "type", "hotkey",
+                             "navigate", "scroll", "wait", "screenshot", "extract"], id: \.self) {
+                        Text($0.capitalized).tag($0)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+            }
+
+            editRow(label: "Target") {
+                TextField("Description of UI element", text: Binding(
+                    get: { step.target.description ?? "" },
+                    set: { step.target.description = $0 }
+                ))
+                .textFieldStyle(.plain)
+                .font(Theme.mono(11))
+                .foregroundColor(Theme.t1)
+                .padding(.horizontal, 8).padding(.vertical, 5)
+                .background(Theme.ctrl)
+                .cornerRadius(5)
+                .overlay(RoundedRectangle(cornerRadius: 5).stroke(Theme.bdiv, lineWidth: 1))
+            }
+
+            editRow(label: "Value") {
+                TextField("Text to type or variable ref", text: Binding(
+                    get: { step.value?.displayString ?? "" },
+                    set: { step.value = $0.isEmpty ? nil : StepValue(raw: $0) }
+                ))
+                .textFieldStyle(.plain)
+                .font(Theme.mono(11))
+                .foregroundColor(Theme.t1)
+                .padding(.horizontal, 8).padding(.vertical, 5)
+                .background(Theme.ctrl)
+                .cornerRadius(5)
+                .overlay(RoundedRectangle(cornerRadius: 5).stroke(Theme.bdiv, lineWidth: 1))
+            }
+
+            editRow(label: "Executor") {
+                Picker("", selection: Binding(
+                    get: { step.executor?.kind ?? "computer_use" },
+                    set: { newKind in
+                        let entry = newKind == "kernel" ? "browser_agent.execute_step" : "desktop_agent.execute_step"
+                        step.executor = StepExecutor(kind: newKind, entryFn: entry)
+                    }
+                )) {
+                    Text("Browser (kernel)").tag("kernel")
+                    Text("Desktop (computer_use)").tag("computer_use")
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+            }
+        }
+        .padding(.horizontal, 22)
+    }
+
+    @ViewBuilder
+    func editRow<Content: View>(label: String, @ViewBuilder _ content: () -> Content) -> some View {
+        HStack(alignment: .center, spacing: 8) {
+            Text(label)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(Theme.t3)
+                .frame(width: 60, alignment: .leading)
+            content()
+            Spacer()
         }
     }
 
@@ -530,21 +593,6 @@ struct ReviewDetailPane: View {
             .cornerRadius(4)
     }
 
-    func loadScreenshot() -> NSImage? {
-        guard let rel = step.screenshot, !rel.isEmpty else { return nil }
-        guard let base = workflowDir else { return nil }
-        let name = URL(fileURLWithPath: rel).lastPathComponent
-        if let dirs = try? FileManager.default.contentsOfDirectory(at: base, includingPropertiesForKeys: nil) {
-            for dir in dirs.sorted(by: { $0.lastPathComponent > $1.lastPathComponent }) {
-                let candidate = dir.appendingPathComponent("screenshots").appendingPathComponent(name)
-                if FileManager.default.fileExists(atPath: candidate.path),
-                   let img = NSImage(contentsOf: candidate) {
-                    return img
-                }
-            }
-        }
-        return nil
-    }
 }
 
 // MARK: - CFToggle

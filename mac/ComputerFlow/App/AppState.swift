@@ -2,6 +2,12 @@ import Foundation
 import Combine
 import SwiftUI
 
+private extension URL {
+    var creationDate: Date? {
+        (try? resourceValues(forKeys: [.creationDateKey]))?.creationDate
+    }
+}
+
 // MARK: - DisplayInfo
 struct DisplayInfo: Identifiable {
     let id: CGDirectDisplayID
@@ -145,6 +151,13 @@ class AppState: ObservableObject {
                     compileSubline = event.subline
                     compileProgress = event.progress
                     print("[CF] Compile event: stage=\(event.stage) progress=\(event.progress) subline=\(event.subline)")
+                    if event.error == true || event.stage == -1 {
+                        print("[CF] Compile error: \(event.subline)")
+                        recordingPanelController?.close()
+                        recordingPanelController = nil
+                        status = .ready
+                        break
+                    }
                     if event.stage == 3 && event.progress >= 100 {
                         compileComplete(workflowId: workflowId)
                         break
@@ -161,25 +174,56 @@ class AppState: ObservableObject {
 
     // MARK: - Compile Complete
     func compileComplete(workflowId: String) {
+        print("[CF] ✅ compileComplete ENTERED for \(workflowId)")
         streamTask?.cancel()
         recordingPanelController?.close()
         recordingPanelController = nil
 
-        Task {
+        Task { @MainActor in
+            print("[CF] ⏳ Fetching workflow JSON…")
             do {
                 let workflow = try await BackendClient.shared.getWorkflow(id: workflowId)
-                WorkflowStore.shared.addOrUpdate(workflow)   // persist immediately
+                print("[CF] ✅ Got workflow: \(workflow.name) with \(workflow.steps.count) steps")
+
+                saveDebugWorkflow(workflow, workflowId: workflowId)
+
+                WorkflowStore.shared.addOrUpdate(workflow)
+                print("[CF] ✅ Saved to WorkflowStore")
                 status = .ready
-                recordingPanelController?.close()
-                recordingPanelController = nil
+
+                print("[CF] 🪟 Creating review window controller…")
                 let controller = WorkflowConfirmationWindowController(workflow: workflow)
                 confirmationWindowController = controller
+                print("[CF] 🪟 Calling controller.show()…")
                 controller.show()
+                print("[CF] ✅ Window shown.")
             } catch {
-                print("[CF] compileComplete ERROR: \(error)")
+                print("[CF] ❌ compileComplete ERROR: \(error)")
+                if let decodingError = error as? DecodingError {
+                    print("[CF] ❌ Decoding detail: \(decodingError)")
+                }
                 status = .ready
             }
         }
+    }
+
+    private func saveDebugWorkflow(_ workflow: WorkflowModel, workflowId: String) {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        guard let data = try? encoder.encode(workflow) else { return }
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        // Find most recent tmp recording dir
+        let tmpDir = appSupport.appendingPathComponent("ComputerFlow/tmp", isDirectory: true)
+        let debugFile: URL
+        if let dirs = try? FileManager.default.contentsOfDirectory(at: tmpDir, includingPropertiesForKeys: [.creationDateKey]),
+           let latest = dirs.sorted(by: { ($0.creationDate ?? .distantPast) > ($1.creationDate ?? .distantPast) }).first {
+            debugFile = latest.appendingPathComponent("workflow_response.json")
+        } else {
+            debugFile = tmpDir.appendingPathComponent("\(workflowId)_workflow_response.json")
+        }
+        try? data.write(to: debugFile)
+        print("[CF] Debug workflow JSON saved to \(debugFile.path)")
     }
 
     // MARK: - Start Run

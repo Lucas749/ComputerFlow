@@ -165,10 +165,36 @@ async def execute_workflow(
         )
 
         runner = ComputerFlowRunner()
-        result = await runner.run_flow(flow)
 
-        # Emit live view URL if available
-        if result.live_view_urls:
+        # Runner's on_event is a sync callback invoked from inside async code
+        # on the same event loop. Put directly onto the queue (nowait) — this
+        # avoids creating cross-thread futures that may never resolve.
+        first_live_view_seen = {"v": False}
+
+        def on_event(ev: dict) -> None:
+            try:
+                ev.setdefault("ts", time.time())
+                queue.put_nowait(ev)
+                try:
+                    with log_path.open("a", encoding="utf-8") as fh:
+                        fh.write(json.dumps(ev) + "\n")
+                except Exception:
+                    pass
+                if ev.get("type") == "live_view" and not first_live_view_seen["v"]:
+                    first_live_view_seen["v"] = True
+                    first_url = next(iter((ev.get("urls") or {}).values()), None)
+                    if first_url:
+                        try:
+                            store.update_run(run_id, live_view_url=first_url)
+                        except Exception:
+                            pass
+            except Exception as e:
+                print(f"[run_manager] on_event failed: {e}")
+
+        result = await runner.run_flow(flow, on_event=on_event)
+
+        # Fallback: if no live_view event came through, emit from final result
+        if result.live_view_urls and not first_live_view_seen["v"]:
             first_url = next(iter(result.live_view_urls.values()), None)
             if first_url:
                 store.update_run(run_id, live_view_url=first_url)

@@ -27,10 +27,13 @@ from app.models import Base, engine  # noqa: E402 — must come after load_doten
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Ensure the data directory exists before creating tables
+    import os, logging
     Path("data").mkdir(exist_ok=True)
-    # Create all SQLAlchemy tables (no-op if they already exist)
     Base.metadata.create_all(bind=engine)
+    compiler = os.environ.get("COMPILER", "lightcone").lower()
+    logging.getLogger("uvicorn.error").info(
+        f"[ComputerFlow] Compiler backend: {'Claude Sonnet 4.6' if compiler == 'claude' else 'Lightcone Northstar'}"
+    )
     yield
 
 

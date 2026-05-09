@@ -139,8 +139,8 @@ struct RecordingPillView: View {
         .frame(width: 360, height: 58)
         .background(
             Capsule()
-                .fill(Color(red: 10/255, green: 10/255, blue: 12/255, opacity: 0.94))
-                .overlay(Capsule().stroke(Color.white.opacity(0.11), lineWidth: 1))
+                .fill(Theme.pillBg)
+                .overlay(Capsule().stroke(Theme.pillBorder, lineWidth: 1))
         )
         .shadow(color: .black.opacity(0.55), radius: 24, x: 0, y: 8)
         .transition(.asymmetric(
@@ -189,8 +189,8 @@ struct RecordingPillView: View {
         .frame(width: 420, height: 66)
         .background(
             Capsule()
-                .fill(Color(red: 10/255, green: 10/255, blue: 12/255, opacity: 0.94))
-                .overlay(Capsule().stroke(Color.white.opacity(0.11), lineWidth: 1))
+                .fill(Theme.pillBg)
+                .overlay(Capsule().stroke(Theme.pillBorder, lineWidth: 1))
         )
         .shadow(color: .black.opacity(0.55), radius: 24, x: 0, y: 8)
     }

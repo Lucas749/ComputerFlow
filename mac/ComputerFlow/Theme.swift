@@ -73,6 +73,16 @@ struct Theme {
         lightColor: NSColor.black.withAlphaComponent(0.28)
     )
 
+    // Pill (floating recording panel)
+    static let pillBg = adaptiveAlpha(
+        darkColor:  NSColor(calibratedRed: 10/255, green: 10/255, blue: 12/255, alpha: 0.94),
+        lightColor: NSColor(calibratedRed: 245/255, green: 245/255, blue: 247/255, alpha: 0.96)
+    )
+    static let pillBorder = adaptiveAlpha(
+        darkColor:  NSColor.white.withAlphaComponent(0.11),
+        lightColor: NSColor.black.withAlphaComponent(0.12)
+    )
+
     // Accents (slightly different hues between dark/light per design)
     static let blue = adaptive(dark: "#2997FF", light: "#007AFF")
     static let grn  = adaptive(dark: "#32D74B", light: "#34C759")
