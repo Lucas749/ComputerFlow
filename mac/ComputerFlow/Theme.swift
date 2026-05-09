@@ -82,6 +82,21 @@ struct Theme {
         darkColor:  NSColor.white.withAlphaComponent(0.11),
         lightColor: NSColor.black.withAlphaComponent(0.12)
     )
+    // Icon inside pill (X button)
+    static let pillIcon = adaptiveAlpha(
+        darkColor:  NSColor.white.withAlphaComponent(0.92),
+        lightColor: NSColor.black.withAlphaComponent(0.80)
+    )
+    // Circular button background inside pill (for X)
+    static let pillCtrl = adaptiveAlpha(
+        darkColor:  NSColor.white.withAlphaComponent(0.08),
+        lightColor: NSColor.black.withAlphaComponent(0.06)
+    )
+    // Animated dots (activity indicator) — visible in both modes
+    static let pillDot = adaptiveAlpha(
+        darkColor:  NSColor.white,
+        lightColor: NSColor(calibratedRed: 60/255, green: 60/255, blue: 65/255, alpha: 1)
+    )
 
     // Accents (slightly different hues between dark/light per design)
     static let blue = adaptive(dark: "#2997FF", light: "#007AFF")

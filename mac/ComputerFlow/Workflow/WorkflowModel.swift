@@ -4,13 +4,14 @@ import Foundation
 struct WorkflowModel: Codable, Identifiable {
     var id: String
     var name: String
+    var summary: String?
     var createdAt: Date
     var updatedAt: Date
     var steps: [WorkflowStep]
     var variables: [WorkflowVariable]
 
     enum CodingKeys: String, CodingKey {
-        case id, name, createdAt, updatedAt, steps, variables
+        case id, name, summary, createdAt, updatedAt, steps, variables
     }
 }
 

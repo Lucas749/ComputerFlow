@@ -156,12 +156,15 @@ async def execute_workflow(
         }
         default_target = target_map.get(router, RunTarget.AUTO)
 
+        summary = (workflow.get("summary") or "").strip()
+        goal = summary or f"Execute workflow: {workflow.get('name', '')}"
         flow = FlowRequest(
             title=workflow.get("name", "Untitled"),
-            goal=f"Execute workflow: {workflow.get('name', '')}",
+            goal=goal,
             steps=steps,
             default_target=default_target,
             default_strategy=default_strategy,
+            context=summary,
         )
 
         runner = ComputerFlowRunner()

@@ -31,6 +31,7 @@ class EventTelemetry: ObservableObject {
     private var captureDisplayID: CGDirectDisplayID?
     private var lastKeyTimestamp: TimeInterval = 0
     private var burstScreenshotPath: String = ""
+    private var lastSuccessfulPath: String = ""   // fallback if capture fails
     private static let keyBurstThresholdMs: TimeInterval = 600  // ms between keystrokes to count as same word
 
     private let captureQueue = DispatchQueue(
@@ -47,6 +48,7 @@ class EventTelemetry: ObservableObject {
         captureDisplayID = displayID
         lastKeyTimestamp = 0
         burstScreenshotPath = ""
+        lastSuccessfulPath = ""
 
         let appSupport = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -169,7 +171,13 @@ class EventTelemetry: ObservableObject {
         guard let dir = screenshotsDir else { return "" }
         let name = String(format: "ev_%04d.jpg", index)
         let url = dir.appendingPathComponent(name)
-        ScreenshotCapture.captureJPEG(to: url, displayID: captureDisplayID)
-        return "screenshots/\(name)"
+        let ok = ScreenshotCapture.captureJPEG(to: url, displayID: captureDisplayID) != nil
+               && FileManager.default.fileExists(atPath: url.path)
+        if ok {
+            lastSuccessfulPath = "screenshots/\(name)"
+            return "screenshots/\(name)"
+        }
+        // Capture failed (can happen mid-keystroke) — fall back to last good path
+        return lastSuccessfulPath.isEmpty ? "screenshots/\(name)" : lastSuccessfulPath
     }
 }

@@ -225,21 +225,43 @@ struct PipView: View {
 }
 
 // MARK: - KernelWebView
+// Kernel live view is a noVNC / WebRTC stream. It needs JS, media autoplay,
+// and a user-agent that the server recognises as a browser.
 struct KernelWebView: NSViewRepresentable {
     let url: URL
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.mediaTypesRequiringUserActionForPlayback = []
+        config.allowsAirPlayForMediaPlayback = true
+        config.preferences.javaScriptCanOpenWindowsAutomatically = true
+
         let webView = WKWebView(frame: .zero, configuration: config)
+        webView.customUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
         webView.allowsMagnification = true
+        webView.navigationDelegate = context.coordinator
+        webView.uiDelegate = context.coordinator
         webView.load(URLRequest(url: url))
         return webView
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
-        if webView.url != url {
+        if webView.url?.absoluteString != url.absoluteString {
             webView.load(URLRequest(url: url))
+        }
+    }
+
+    class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            print("[KernelWebView] didFail: \(error)")
+        }
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            print("[KernelWebView] didFailProvisional: \(error)")
+        }
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            print("[KernelWebView] loaded: \(webView.url?.absoluteString ?? "?")")
         }
     }
 }

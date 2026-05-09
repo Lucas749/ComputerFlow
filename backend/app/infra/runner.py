@@ -767,7 +767,7 @@ class ComputerFlowRunner:
                 _sp.Popen(["open", shots_dir])
 
             live_b64 = await backend.screenshot_b64()
-            content = _build_step_content(step, live_b64)
+            content = _build_step_content(step, live_b64, workflow_summary=flow.context or "")
 
             # Seed list and save initial frame immediately
             step_shots: list[str] = [live_b64]
@@ -933,11 +933,12 @@ def _steps_to_prompt(flow: FlowRequest, steps: list[SOPStep]) -> str:
     return "\n".join(parts)
 
 
-def _build_step_content(step: SOPStep, live_b64: str) -> list[dict]:
+def _build_step_content(step: SOPStep, live_b64: str, workflow_summary: str = "") -> list[dict]:
     """
     Build the `content` array for one CUA loop iteration.
 
     Always includes:
+      - (optional) The workflow-level high-level summary
       - The step instruction text
       - The current live screenshot
 
@@ -945,7 +946,15 @@ def _build_step_content(step: SOPStep, live_b64: str) -> list[dict]:
       - The reference screenshot from the recording
       - A note describing the annotation (bounding box)
     """
-    instruction = step.intent
+    instruction = ""
+    if workflow_summary:
+        instruction += (
+            f"OVERALL GOAL: {workflow_summary}\n\n"
+            "The workflow below was recorded from a user demo; use the overall goal "
+            "to disambiguate individual step intents when they look redundant "
+            "(e.g. a click on empty space that just focuses the window).\n\n"
+        )
+    instruction += f"CURRENT STEP: {step.intent}"
     if step.action == ActionType.TYPE and step.text:
         instruction += f' Type: "{step.text}"'
     elif step.action == ActionType.NAVIGATE and step.text:

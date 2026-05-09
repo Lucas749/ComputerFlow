@@ -31,7 +31,7 @@ class AppState: ObservableObject {
     @Published var currentRunId: String?
     @Published var permissionsGranted: Bool = false
     @Published var selectedDisplayID: CGDirectDisplayID? = nil
-    @Published var isDarkMode: Bool = true {
+    @Published var isDarkMode: Bool = false {
         didSet { NSApp.appearance = NSAppearance(named: isDarkMode ? .darkAqua : .aqua) }
     }
     @Published var compileSubline: String = "Preparing…"

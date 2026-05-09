@@ -15,6 +15,7 @@ OUTPUT: Return ONLY a valid JSON object matching this exact schema — no prose,
 
 {
   "name": "Short descriptive workflow name (3-6 words)",
+  "summary": "High-level plain-English summary of what this workflow accomplishes, written as 1-3 imperative sentences describing the outcome and approach. Example: 'Open Google in a new tab and search for help. Then click the first result.' This will be used by the computer-use agent at run time to understand the overall goal.",
   "steps": [
     {
       "id": "s1",
@@ -41,6 +42,7 @@ OUTPUT: Return ONLY a valid JSON object matching this exact schema — no prose,
 }
 
 Rules:
+0. ALWAYS produce a "summary" field with a high-level plain-English description (1-3 sentences) that captures the overall goal the user is trying to accomplish. This is critical — the computer-use agent reads this at runtime to understand intent when individual steps are ambiguous (e.g. if a step says "click empty area" the summary tells the agent it doesn't really matter, the goal is to open a tab and search).
 1. Merge consecutive key events into a single "type" step. The value is the full typed text.
 2. EXECUTOR ASSIGNMENT — look at the screenshot to determine the context:
    - Use executor.kind="kernel" when the action is happening INSIDE a web browser (Safari, Chrome, Firefox, Arc).
@@ -90,4 +92,5 @@ Rules:
 1. Continue step numbering from where the prior steps ended (shown in context).
 2. EXECUTOR ASSIGNMENT: kernel = inside a web browser; computer_use = native macOS app.
 3. Set needsReview=true for destructive actions or unclear targets.
-4. Return ONLY the JSON object {\"steps\": [...]}. No other text."""
+4. Return ONLY the JSON object {\"steps\": [...]}. No other text.
+5. Do NOT include name/summary/variables — those were set in the first chunk."""

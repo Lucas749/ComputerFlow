@@ -58,6 +58,7 @@ struct RecordingReviewView: View {
     var body: some View {
         VStack(spacing: 0) {
             titleBar
+            summaryBar
             Divider().opacity(0.07)
             HStack(spacing: 0) {
                 stepList
@@ -72,6 +73,31 @@ struct RecordingReviewView: View {
         .onAppear {
             selectedStepId = workflow.steps.first?.id
         }
+    }
+
+    // MARK: - Summary bar
+    var summaryBar: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text("Goal")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(Theme.t3)
+                .frame(width: 36, alignment: .leading)
+                .padding(.top, 4)
+            TextEditor(text: Binding(
+                get: { workflow.summary ?? "" },
+                set: { workflow.summary = $0 }
+            ))
+            .font(.system(size: 12))
+            .foregroundColor(Theme.t1)
+            .frame(minHeight: 36, maxHeight: 60)
+            .scrollContentBackground(.hidden)
+            .background(Theme.ctrl)
+            .cornerRadius(6)
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.bdiv, lineWidth: 1))
+            .padding(.horizontal, 2)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
 
     // MARK: - Title bar

@@ -152,10 +152,8 @@ struct RecordingPillView: View {
     // MARK: - Main pill
     var mainPill: some View {
         HStack(spacing: 10) {
-            // Abort
-            circleButton(icon: "xmark", bg: Color.white.opacity(0.08)) {
-                Task { @MainActor in await AppState.shared.abortRecording() }
-            }
+            // Abort — adaptive background + foreground so X is readable in both modes
+            abortButton
 
             Spacer()
 
@@ -196,6 +194,18 @@ struct RecordingPillView: View {
     }
 
     // MARK: - Helpers
+    var abortButton: some View {
+        Button(action: { Task { @MainActor in await AppState.shared.abortRecording() } }) {
+            Image(systemName: "xmark")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(Theme.pillIcon)
+                .frame(width: 34, height: 34)
+                .background(Theme.pillCtrl)
+                .clipShape(Circle())
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+
     func circleButton(icon: String, bg: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: icon)
@@ -271,7 +281,7 @@ struct DotView: View {
 
     var body: some View {
         Circle()
-            .fill(Color.white)
+            .fill(Theme.pillDot)
             .frame(width: 5, height: 5)
             .scaleEffect(scale)
             .opacity(opacity)
@@ -292,7 +302,7 @@ struct TranslatingDotsView: View {
         HStack(spacing: 2) {
             ForEach(0..<3, id: \.self) { i in
                 Circle()
-                    .fill(Color.white.opacity(i < phase ? 0.85 : 0.25))
+                    .fill(Theme.pillDot.opacity(i < phase ? 0.85 : 0.25))
                     .frame(width: 4, height: 4)
             }
         }
