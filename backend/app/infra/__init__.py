@@ -1,17 +1,18 @@
 __all__ = [
-    # Runner — primary entry point for executing flows
+    # Runner — primary entry point
     "ComputerFlowRunner",
-    "RunConfig",
-    "RunResult",
-    "ExecutionMode",
-    # SOP / action types — shared contract between recorder, compiler, runner
-    "SOP",
-    "SOPStep",
+    "FlowRequest",
+    "FlowResult",
+    "RunOptions",
+    # Action / SOP types
     "RecordedAction",
+    "SOPStep",
     "ActionType",
     "TargetKind",
     "Surface",
-    # Low-level clients
+    "RunTarget",
+    "ExecutionStrategy",
+    # Low-level clients (direct use / testing)
     "LightconeClient",
     "ComputerSession",
     "ComputerKind",
@@ -24,8 +25,11 @@ __all__ = [
     "NIMClient",
 ]
 
-_RUNNER    = ("ComputerFlowRunner", "RunConfig", "RunResult", "ExecutionMode")
-_TYPES     = ("SOP", "SOPStep", "RecordedAction", "ActionType", "TargetKind", "Surface")
+_RUNNER    = ("ComputerFlowRunner", "FlowRequest", "FlowResult", "RunOptions")
+_TYPES     = (
+    "RecordedAction", "SOPStep", "ActionType",
+    "TargetKind", "Surface", "RunTarget", "ExecutionStrategy",
+)
 _LIGHTCONE = ("LightconeClient", "ComputerSession", "ComputerKind", "TaskEvent")
 _KERNEL    = ("KernelClient", "BrowserSession", "BrowserInfo", "PlaywrightResult")
 _BREV      = ("BrevClient", "NIMClient")
@@ -33,10 +37,13 @@ _BREV      = ("BrevClient", "NIMClient")
 
 def __getattr__(name):
     if name in _RUNNER:
-        from .runner import ComputerFlowRunner, RunConfig, RunResult, ExecutionMode
+        from .runner import ComputerFlowRunner, FlowRequest, FlowResult, RunOptions
         return locals()[name]
     if name in _TYPES:
-        from .types import SOP, SOPStep, RecordedAction, ActionType, TargetKind, Surface
+        from .types import (
+            RecordedAction, SOPStep, ActionType,
+            TargetKind, Surface, RunTarget, ExecutionStrategy,
+        )
         return locals()[name]
     if name in _LIGHTCONE:
         from .lightcone import LightconeClient, ComputerSession, ComputerKind, TaskEvent

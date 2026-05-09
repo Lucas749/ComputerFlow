@@ -1,0 +1,242 @@
+"""
+workflows.py — Workflow CRUD endpoints.
+
+POST /workflows/upload          Upload video + optional events file; starts compile
+GET  /workflows/{id}            Return full workflow.json
+PUT  /workflows/{id}            Replace workflow.json (atomic)
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import secrets
+from pathlib import Path
+from typing import Optional
+
+import aiofiles
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from app.models import get_db
+from app.store import (
+    WorkflowStore,
+    ensure_workflow_dirs,
+    event_screenshots_dir,
+    events_path,
+    video_path,
+)
+
+router = APIRouter()
+
+
+# ── Upload + compile ──────────────────────────────────────────────────────────
+
+@router.post("/workflows/upload")
+async def upload_workflow(
+    video: UploadFile = File(...),
+    events: Optional[UploadFile] = File(None),
+    screenshots: list[UploadFile] = File(default=[]),
+    db: Session = Depends(get_db),
+):
+    """
+    Upload an .mp4 screen recording (and optional .events.json telemetry).
+
+    1. Generates a ``wf_`` prefixed ID.
+    2. Saves files to ``data/workflows/{id}/videos/``.
+    3. Inserts a Workflow row (status="compiling").
+    4. Kicks off the compile pipeline as a background asyncio task.
+    5. Returns ``{"id": "wf_...", "status": "compiling"}`` immediately.
+    """
+    workflow_id = "wf_" + secrets.token_urlsafe(8)
+    ensure_workflow_dirs(workflow_id)
+
+    # Save video
+    vid_path = video_path(workflow_id)
+    async with aiofiles.open(vid_path, "wb") as f:
+        content = await video.read()
+        await f.write(content)
+
+    # Save events file (optional)
+    ev_path: Optional[Path] = None
+    if events and events.filename:
+        ev_path = events_path(workflow_id)
+        async with aiofiles.open(ev_path, "wb") as f:
+            ev_content = await events.read()
+            await f.write(ev_content)
+
+    # Save per-event screenshots (ev_XXXX.jpg) uploaded from the Mac client.
+    # These are lossless pre-action frames — the compiler prefers them over
+    # ffmpeg-extracted video frames.
+    shots_dir = event_screenshots_dir(workflow_id)
+    for shot in screenshots or []:
+        if not shot.filename:
+            continue
+        out = shots_dir / Path(shot.filename).name  # strip any directory
+        async with aiofiles.open(out, "wb") as f:
+            await f.write(await shot.read())
+
+    # Create DB record
+    store = WorkflowStore(db)
+    name = Path(video.filename or "Untitled").stem.replace("_", " ").replace("-", " ").title()
+    store.create_workflow(workflow_id, name=name)
+
+    # Fire-and-forget compile task
+    asyncio.create_task(
+        _run_compile(workflow_id=workflow_id, name=name, db=db)
+    )
+
+    return {"id": workflow_id, "status": "compiling"}
+
+
+# ── Get workflow ──────────────────────────────────────────────────────────────
+
+@router.get("/workflows/{workflow_id}")
+async def get_workflow(workflow_id: str, db: Session = Depends(get_db)):
+    """Return the full workflow.json for the given ID."""
+    store = WorkflowStore(db)
+    wf = store.get_workflow(workflow_id)
+    if wf is None:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    data = store.read_workflow_json(workflow_id)
+    if data is None:
+        # Workflow exists in DB but JSON not yet written (still compiling)
+        return JSONResponse(
+            content={"id": workflow_id, "status": wf.status},
+            status_code=202,
+        )
+    return data
+
+
+# ── Update workflow ───────────────────────────────────────────────────────────
+
+class WorkflowUpdateBody(BaseModel):
+    model_config = {"extra": "allow"}  # accept the full workflow JSON object
+
+
+@router.put("/workflows/{workflow_id}")
+async def update_workflow(
+    workflow_id: str,
+    body: WorkflowUpdateBody,
+    db: Session = Depends(get_db),
+):
+    """
+    Replace the workflow.json for the given ID (atomic write + DB update).
+    Accepts the full workflow JSON as the request body.
+    """
+    store = WorkflowStore(db)
+    wf = store.get_workflow(workflow_id)
+    if wf is None:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    workflow_dict = body.model_dump()
+    store.update_workflow_json(workflow_id, workflow_dict)
+    return {"id": workflow_id, "status": "ready"}
+
+
+# ── Background compile pipeline ───────────────────────────────────────────────
+
+async def _run_compile(workflow_id: str, name: str, db: Session) -> None:
+    """
+    Background task: event-driven compile.
+
+    Preferred path:  Mac client uploaded per-event screenshots → use Lightcone
+                     CUA model to describe each semantic action directly.
+
+    Fallback path:   No screenshots uploaded (e.g. legacy client) → fall back
+                     to the ffmpeg + Claude pipeline.
+    """
+    from app.api.stream import get_compile_queue
+    from app.compiler.lightcone_vlm import compile_with_lightcone
+    from app.store import (
+        WorkflowStore,
+        event_screenshots_dir,
+        events_path as get_events_path,
+    )
+
+    queue = get_compile_queue(workflow_id)
+    store = WorkflowStore(db)
+
+    loop = asyncio.get_event_loop()
+
+    async def emit(stage: int, progress: int, subline: str, **extra) -> None:
+        await queue.put(
+            {"stage": stage, "progress": progress, "subline": subline, **extra}
+        )
+
+    def emit_sync(stage: int, progress: int, subline: str) -> None:
+        # Called from worker thread — schedule on the loop.
+        asyncio.run_coroutine_threadsafe(emit(stage, progress, subline), loop)
+
+    try:
+        await emit(0, 5, "Preparing recording…")
+
+        ev_file = get_events_path(workflow_id)
+        shots_dir = event_screenshots_dir(workflow_id)
+
+        events_data: list[dict] = []
+        if ev_file.exists():
+            try:
+                events_data = json.loads(ev_file.read_text(encoding="utf-8"))
+            except Exception:
+                events_data = []
+
+        has_event_shots = shots_dir.exists() and any(shots_dir.glob("ev_*.jpg"))
+
+        if has_event_shots and events_data:
+            await emit(0, 15, "Using pre-action screenshots…")
+
+            workflow_json = await loop.run_in_executor(
+                None,
+                lambda: compile_with_lightcone(
+                    workflow_id=workflow_id,
+                    events=events_data,
+                    screenshots_dir=shots_dir,
+                    name=name,
+                    progress_callback=emit_sync,
+                ),
+            )
+        else:
+            # ── Fallback: Claude video-frame pipeline ─────────────────────
+            await emit(0, 10, "Parsing video frames…")
+            from app.compiler.frames import extract_candidates
+            from app.compiler.frame_selector import select_frames
+            from app.compiler.vlm import compile_to_workflow
+            from app.store import video_path as get_video_path
+
+            vid = get_video_path(workflow_id)
+
+            candidates = await loop.run_in_executor(
+                None, extract_candidates, vid, events_data or None
+            )
+            await emit(1, 30, "Selecting key frames…")
+            selected = await loop.run_in_executor(None, select_frames, candidates)
+
+            await emit(1, 40, "Identifying UI elements…")
+
+            async def progress_cb(stage: int, progress: int, subline: str) -> None:
+                await emit(stage, progress, subline)
+
+            workflow_json = await loop.run_in_executor(
+                None,
+                lambda: compile_to_workflow(
+                    workflow_id=workflow_id,
+                    frames=selected,
+                    events=events_data,
+                    name=name,
+                    progress_callback=progress_cb,
+                ),
+            )
+
+        store.update_workflow_json(workflow_id, workflow_json)
+        await emit(3, 100, "Complete", workflowId=workflow_id)
+
+    except Exception as exc:
+        store.update_workflow_status(workflow_id, "error")
+        await queue.put(
+            {"stage": "error", "progress": 0, "subline": str(exc), "error": True}
+        )
+        raise

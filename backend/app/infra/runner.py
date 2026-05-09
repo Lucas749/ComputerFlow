@@ -1,147 +1,401 @@
 """
 ComputerFlowRunner — single entry point for all task execution.
 
-This is what the orchestrating model (Claude) calls to replay a user flow.
-Pick the right mode for the job; `execute()` accepts a RunConfig and returns
-a RunResult with the answer and a live-view URL the UI can surface.
+The runner takes a FlowRequest (list of typed SOP steps) and routes each
+step to the right backend. It handles:
 
-Execution modes
----------------
-BROWSER_CUA    Kernel cloud browser + Northstar manual CUA loop.
-               Best for: web tasks that need precise step-by-step control,
-               tasks with images/annotations marking targets on the page.
+  1. KERNEL_BROWSER  — Kernel cloud Chromium + Northstar CUA loop
+  2. LIGHTCONE_OS    — Lightcone cloud Linux desktop + Northstar CUA loop
+  3. LOCAL           — User's own machine + Northstar CUA loop (local capture)
 
-DESKTOP_TASK   Lightcone fully-autonomous desktop task.
-               Best for: native apps, legacy software, multi-window flows,
-               anything that needs a real OS desktop.
+  4. AUTONOMOUS strategy  — whole task as one NL prompt → Northstar Task API
+  5. CUA_LOOP strategy    — manual screenshot → model → action loop (CUA protocol)
+  6. DIRECT strategy      — replay recorded coordinates directly, no model
 
-BROWSER_TASK   Lightcone fully-autonomous browser task.
-               Best for: pure web workflows where you want Northstar to drive
-               everything end-to-end without a separate Kernel session.
+  7. Mixed / handoff      — consecutive steps with different targets trigger a
+                            session handoff automatically.
 
-BATCH          Run the same task template across a list of records.
-               Best for: data entry, form filling, bulk operations.
-
-Quickstart
-----------
-    from app.infra.runner import ComputerFlowRunner, RunConfig, ExecutionMode
-
+Primary call
+------------
     runner = ComputerFlowRunner()
-
-    # One-shot web task
-    result = await runner.execute(RunConfig(
-        mode=ExecutionMode.BROWSER_CUA,
-        task="Go to stripe.com and find the pricing for the Pro plan",
-    ))
+    result = await runner.run_flow(flow_request)
     print(result.answer)
-    print(result.live_view_url)   # hand to UI so user can watch
-
-    # Autonomous desktop task
-    result = await runner.execute(RunConfig(
-        mode=ExecutionMode.DESKTOP_TASK,
-        task="Open LibreOffice, create a new spreadsheet, add 'Hello' in A1, save as /tmp/test.xlsx",
-    ))
-
-    # Batch form fill
-    results = await runner.run_batch(
-        records=[
-            {"name": "Alice Chen",  "email": "alice@acme.com", "role": "Manager"},
-            {"name": "Bob Patel",   "email": "bob@acme.com",   "role": "Engineer"},
-        ],
-        instruction_template=(
-            "Go to https://admin.example.com/users/new. "
-            "Fill Name: '{name}', Email: '{email}', Role: '{role}'. "
-            "Click Create User."
-        ),
-        mode=ExecutionMode.DESKTOP_TASK,
-    )
+    print(result.live_view_urls)   # {"kernel_browser": "...", "lightcone_os": "..."}
 """
 
 from __future__ import annotations
 
 import asyncio
+import base64
 import os
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
-from app.infra.types import SOP, Surface
-
-
-# ── Execution mode ────────────────────────────────────────────────────────────
-
-class ExecutionMode(str, Enum):
-    BROWSER_CUA  = "browser_cua"   # Kernel browser + Northstar manual loop
-    DESKTOP_TASK = "desktop_task"  # Lightcone autonomous desktop
-    BROWSER_TASK = "browser_task"  # Lightcone autonomous browser
-    BATCH        = "batch"         # Same template × many records
+from app.infra.types import (
+    ActionType,
+    ExecutionStrategy,
+    FlowRequest,
+    RunOptions,
+    RunTarget,
+    SOPStep,
+    Surface,
+)
 
 
-# ── Config / Result types ─────────────────────────────────────────────────────
+# ── Result types ──────────────────────────────────────────────────────────────
 
 @dataclass
-class RunConfig:
+class FlowResult:
     """
-    Everything needed to run one task.
+    Outcome of a full flow execution.
 
-    Fields
-    ------
-    mode              Which executor to use (see ExecutionMode).
-    task              Natural-language instruction for the agent.
-    max_steps         Hard cap on action steps before giving up.
-    environment_id    Reuse a persistent Lightcone environment (desktop/browser).
-                      Save result.environment_id after the first run to reuse it.
-    records           For BATCH mode: list of dicts to interpolate into
-                      `instruction_template`.
-    instruction_template
-                      For BATCH mode: Python str.format(**record) template.
-                      E.g. "Create user {name} with email {email}."
-    persistent        If True, the Lightcone environment is saved after the run
-                      so it can be reused via environment_id next time.
-    stealth           For BROWSER_CUA: enable bot-detection bypass.
-    concurrency       For BATCH mode: how many records to run in parallel.
-    viewport_width    Browser viewport width (BROWSER_CUA / BROWSER_TASK).
-    viewport_height   Browser viewport height.
-    """
-    mode: ExecutionMode
-    task: str = ""
-    max_steps: int = 50
-    environment_id: str | None = None
-    records: list[dict] | None = None
-    instruction_template: str | None = None
-    persistent: bool = False
-    stealth: bool = True
-    concurrency: int = 1
-    viewport_width: int = 1280
-    viewport_height: int = 800
-
-
-@dataclass
-class RunResult:
-    """
-    Outcome of a single task execution.
-
-    Fields
-    ------
-    answer            The agent's final text answer / summary.
-    steps             Number of action steps taken.
-    mode              Which executor was used.
-    live_view_url     Open this URL in a browser to watch the session in real time.
-                      None if the executor doesn't surface one.
-    environment_id    If the run used or created a persistent environment, its ID.
-                      Save this to pass as RunConfig.environment_id on the next run.
-    events            Raw event list from the executor (useful for debugging).
-    ok                False if the run ended in an unhandled error.
-    error             Error message when ok=False.
+    live_view_urls    Map of target → live-view URL so the frontend can show
+                      the user what's happening on each surface in real time.
+                      Keys match RunTarget values, e.g. "kernel_browser".
+    environment_id    If a persistent Lightcone OS environment was used or
+                      created, save this and pass it back next time to skip
+                      environment setup.
     """
     answer: str
-    steps: int
-    mode: ExecutionMode
-    live_view_url: str | None = None
+    steps_taken: int
+    live_view_urls: dict[str, str] = field(default_factory=dict)
     environment_id: str | None = None
+    replay_id: str | None = None      # Kernel session replay ID (browser flows)
     events: list[Any] = field(default_factory=list)
     ok: bool = True
     error: str | None = None
+
+
+# ── CUA backend protocol ──────────────────────────────────────────────────────
+
+@runtime_checkable
+class CUABackend(Protocol):
+    """
+    Interface all three CUA backends must implement.
+
+    The CUA loop in _run_cua_loop() calls only these two methods, so swapping
+    KERNEL_BROWSER / LIGHTCONE_OS / LOCAL is a matter of passing a different backend.
+    """
+    async def screenshot_b64(self) -> str:
+        """Capture current screen, return bare base64-encoded PNG."""
+        ...
+
+    async def execute_action(self, action: Any) -> None:
+        """Execute one Northstar computer_call action on the target surface."""
+        ...
+
+
+# ── Kernel browser backend ────────────────────────────────────────────────────
+
+class KernelBrowserBackend:
+    """CUA backend that controls a Kernel cloud Chromium session."""
+
+    def __init__(self, kernel_sdk: Any, session_id: str) -> None:
+        self._k = kernel_sdk
+        self._sid = session_id
+
+    async def screenshot_b64(self) -> str:
+        resp = await self._k.browsers.computer.capture_screenshot(self._sid)
+        return base64.b64encode(await resp.read()).decode()
+
+    async def execute_action(self, action: Any) -> None:
+        t = getattr(action, "type", "")
+
+        if t == "click":
+            await self._k.browsers.computer.click_mouse(self._sid, x=action.x, y=action.y)
+
+        elif t == "double_click":
+            await self._k.browsers.computer.click_mouse(
+                self._sid, x=action.x, y=action.y, num_clicks=2
+            )
+
+        elif t == "right_click":
+            await self._k.browsers.computer.click_mouse(
+                self._sid, x=action.x, y=action.y, button="right"
+            )
+
+        elif t == "type":
+            await self._k.browsers.computer.type_text(self._sid, text=action.text)
+
+        elif t in ("key", "keypress"):
+            keys = action.keys if isinstance(action.keys, list) else [action.keys]
+            await self._k.browsers.computer.press_key(self._sid, keys=keys)
+
+        elif t == "scroll":
+            await self._k.browsers.computer.scroll(
+                self._sid,
+                x=getattr(action, "x", 640),
+                y=getattr(action, "y", 360),
+                delta_x=0,
+                delta_y=getattr(action, "scroll_y", 0),
+            )
+
+        elif t == "hscroll":
+            await self._k.browsers.computer.scroll(
+                self._sid,
+                x=getattr(action, "x", 640),
+                y=getattr(action, "y", 360),
+                delta_x=getattr(action, "scroll_x", 0),
+                delta_y=0,
+            )
+
+        elif t == "drag":
+            await self._k.browsers.computer.drag_mouse(
+                self._sid,
+                path=[[action.x, action.y], [action.end_x, action.end_y]],
+            )
+
+        elif t == "navigate":
+            await self._k.browsers.playwright.execute(
+                self._sid,
+                code=f"await page.goto({getattr(action, 'url', '')!r}); "
+                     "await page.waitForLoadState('networkidle');",
+            )
+
+        elif t == "wait":
+            await asyncio.sleep(2)
+
+
+# ── Lightcone OS backend ──────────────────────────────────────────────────────
+
+class LightconeOSBackend:
+    """
+    CUA backend that controls a Lightcone cloud Linux desktop.
+
+    Uses the Responses API (lc.responses.create) for model decisions and
+    lc.computers.METHOD(computer_id, ...) for action execution — consistent
+    with the CUA protocol described at docs.lightcone.ai/guides/cua-protocol/.
+    """
+
+    def __init__(self, lc_sdk: Any, computer_id: str) -> None:
+        self._lc = lc_sdk
+        self._cid = computer_id
+
+    async def screenshot_b64(self) -> str:
+        raw = await self._lc.computers.screenshot(self._cid, base64=True)
+        result = getattr(raw, "result", None)
+        # result can be a bare base64 string, a data-URI, or a dict {"image": "..."}
+        # SDK returns ActionResult where result is {"screenshot_url": "<base64 jpeg>"}
+        if isinstance(result, dict):
+            b64 = (
+                result.get("screenshot_url")
+                or result.get("image")
+                or result.get("data")
+                or result.get("b64")
+                or ""
+            )
+        else:
+            b64 = result or ""
+        if isinstance(b64, str) and b64.startswith("data:"):
+            b64 = b64.split(",", 1)[1]
+        return b64 or ""
+
+    async def execute_action(self, action: Any) -> None:
+        t = getattr(action, "type", "")
+        cid = self._cid
+
+        if t == "click":
+            await self._lc.computers.click(cid, x=action.x, y=action.y)
+
+        elif t == "double_click":
+            await self._lc.computers.double_click(cid, x=action.x, y=action.y)
+
+        elif t == "right_click":
+            await self._lc.computers.right_click(cid, x=action.x, y=action.y)
+
+        elif t == "type":
+            await self._lc.computers.type(cid, text=action.text)
+
+        elif t in ("key", "keypress"):
+            keys = action.keys if isinstance(action.keys, list) else [action.keys]
+            await self._lc.computers.hotkey(cid, keys=keys)
+
+        elif t == "scroll":
+            await self._lc.computers.scroll(
+                cid,
+                x=getattr(action, "x", 640),
+                y=getattr(action, "y", 360),
+                dx=0,
+                dy=getattr(action, "scroll_y", 0),
+            )
+
+        elif t == "hscroll":
+            await self._lc.computers.scroll(
+                cid,
+                x=getattr(action, "x", 640),
+                y=getattr(action, "y", 360),
+                dx=getattr(action, "scroll_x", 0),
+                dy=0,
+            )
+
+        elif t == "drag":
+            await self._lc.computers.drag(
+                cid, x=action.x, y=action.y, end_x=action.end_x, end_y=action.end_y
+            )
+
+        elif t == "navigate":
+            await self._lc.computers.navigate(cid, url=getattr(action, "url", ""))
+
+        elif t == "wait":
+            await asyncio.sleep(2)
+
+
+# ── Local CUA backend ─────────────────────────────────────────────────────────
+
+class LocalCUABackend:
+    """
+    CUA backend that controls the user's own machine.
+
+    Requires the ComputerFlow local agent to be running (started automatically
+    by the desktop app). The local agent exposes a tiny HTTP server on
+    localhost:27182 that accepts screenshot and action requests so this class
+    can stay async/non-blocking.
+
+    Falls back gracefully if the local agent is unreachable.
+    """
+
+    LOCAL_AGENT_URL = "http://localhost:27182"
+
+    async def screenshot_b64(self) -> str:
+        import aiohttp
+        async with aiohttp.ClientSession() as s:
+            async with s.get(f"{self.LOCAL_AGENT_URL}/screenshot") as r:
+                data = await r.json()
+                return data["b64"]
+
+    async def execute_action(self, action: Any) -> None:
+        import aiohttp
+        payload: dict = {"type": getattr(action, "type", "")}
+
+        t = payload["type"]
+        if t in ("click", "double_click", "right_click", "drag"):
+            payload.update(x=action.x, y=action.y)
+            if t == "drag":
+                payload.update(end_x=action.end_x, end_y=action.end_y)
+        elif t == "type":
+            payload["text"] = action.text
+        elif t in ("key", "keypress"):
+            payload["keys"] = action.keys if isinstance(action.keys, list) else [action.keys]
+        elif t in ("scroll", "hscroll"):
+            payload.update(
+                x=getattr(action, "x", 640),
+                y=getattr(action, "y", 360),
+                scroll_x=getattr(action, "scroll_x", 0),
+                scroll_y=getattr(action, "scroll_y", 0),
+            )
+
+        async with aiohttp.ClientSession() as s:
+            await s.post(f"{self.LOCAL_AGENT_URL}/action", json=payload)
+
+
+# ── CUA loop (shared across all backends) ────────────────────────────────────
+
+async def _run_cua_loop(
+    lc_sdk: Any,
+    backend: CUABackend,
+    initial_content: list[dict],
+    model: str,
+    width: int,
+    height: int,
+    environment: str,
+    max_actions: int,
+    step_delay_ms: int,
+) -> tuple[str, int, list[Any]]:
+    """
+    Core CUA protocol loop — identical for all three backends.
+
+    Sends initial_content to Northstar, then loops:
+      screenshot → model → action → execute → repeat
+
+    Returns (answer, actions_taken, events).
+    """
+    computer_tool = {
+        "type": "computer_use",
+        "display_width": width,
+        "display_height": height,
+        "environment": environment,
+    }
+
+    response = await lc_sdk.responses.create(
+        model=model,
+        input=[{"role": "user", "content": initial_content}],
+        tools=[computer_tool],
+    )
+
+    answer = ""
+    actions_taken = 0
+    events: list[Any] = []
+
+    for _ in range(max_actions):
+        # Find the computer_call in the response output
+        computer_call = None
+        for block in getattr(response, "output", []) or []:
+            if getattr(block, "type", "") == "computer_call":
+                computer_call = block
+                break
+
+        if not computer_call:
+            # No pending action — extract text answer
+            answer = _extract_text(response)
+            break
+
+        action = computer_call.action
+        action_type = getattr(action, "type", "unknown")
+        events.append({"action": action_type})
+
+        # Terminal actions
+        if action_type in ("terminate", "done", "answer"):
+            answer = (
+                getattr(action, "text", "")
+                or getattr(action, "answer", "")
+                or getattr(action, "result", "")
+                or _extract_text(response)
+            )
+            break
+
+        await backend.execute_action(action)
+        actions_taken += 1
+        await asyncio.sleep(step_delay_ms / 1000)
+
+        b64 = await backend.screenshot_b64()
+        response = await lc_sdk.responses.create(
+            model=model,
+            previous_response_id=response.id,
+            input=[{
+                "type": "computer_call_output",
+                "call_id": computer_call.call_id,
+                "output": {
+                    "type": "input_image",
+                    "image_url": f"data:image/jpeg;base64,{b64}" if b64.startswith("/9j/") else f"data:image/png;base64,{b64}",
+                    "detail": "auto",
+                },
+            }],
+            tools=[computer_tool],
+        )
+
+    # If the loop exhausted without a terminal action, pull whatever text is in the last response
+    answer = answer or _extract_text(response)
+    return answer, actions_taken, events
+
+
+def _extract_text(response: Any) -> str:
+    for block in getattr(response, "output", []) or []:
+        block_type = getattr(block, "type", "")
+        if block_type == "text":
+            return getattr(block, "text", "")
+        if block_type == "message":
+            content = getattr(block, "content", None)
+            if isinstance(content, str):
+                return content
+            if isinstance(content, list):
+                parts = [
+                    str(getattr(c, "text", None) or getattr(c, "content", None) or "")
+                    for c in content
+                    if getattr(c, "text", None) or getattr(c, "content", None)
+                ]
+                if parts:
+                    return "\n".join(parts)
+    return ""
 
 
 # ── Runner ────────────────────────────────────────────────────────────────────
@@ -150,22 +404,19 @@ class ComputerFlowRunner:
     """
     Single entry point for all ComputerFlow task execution.
 
-    The orchestrating model should instantiate this once and call either
-    `execute(config)` for a single task or `run_batch(...)` for bulk work.
-
-    All heavy SDK imports are deferred until the first call so the class
-    can be imported cheaply without network calls or auth checks.
-
-    Environment variables read (at least one pair must be set):
-        KERNEL_API_KEY     — required for BROWSER_CUA mode
-        TZAFON_API_KEY     — required for DESKTOP_TASK / BROWSER_TASK / BATCH
-        LIGHTCONE_API_KEY  — alias for TZAFON_API_KEY
+    Reads API keys from environment:
+        KERNEL_API_KEY          — required for KERNEL_BROWSER target
+        TZAFON_API_KEY          — required for LIGHTCONE_OS target and CUA decisions
+        LIGHTCONE_API_KEY       — alias for TZAFON_API_KEY
     """
+
+    MODEL = "tzafon.northstar-cua-fast"
 
     def __init__(
         self,
         kernel_api_key: str | None = None,
         lightcone_api_key: str | None = None,
+        open_live_views: bool = False,
     ) -> None:
         self._kernel_key = kernel_api_key or os.environ.get("KERNEL_API_KEY")
         self._lightcone_key = (
@@ -173,480 +424,416 @@ class ComputerFlowRunner:
             or os.environ.get("TZAFON_API_KEY")
             or os.environ.get("LIGHTCONE_API_KEY")
         )
+        self._open_live_views = open_live_views
 
-    # ── Main entry point ──────────────────────────────────────────────────────
+    # ── Primary entry point ───────────────────────────────────────────────────
 
-    async def execute(self, config: RunConfig) -> RunResult:
+    async def run_flow(self, flow: FlowRequest) -> FlowResult:
         """
-        Execute a task according to config.mode.
+        Execute a full flow, handling target routing and handoffs automatically.
 
-        This is the primary method the orchestrating model should call.
-        Returns a RunResult with `answer` and `live_view_url`.
+        Steps are grouped into contiguous runs by (target, strategy).
+        When the target changes between steps a session handoff occurs —
+        the previous session stays open so it can receive future steps if the
+        flow toggles back.
 
-        Raises ValueError for BATCH mode without records/template.
-        Wraps all other errors: result.ok=False, result.error=<message>.
+        Returns a FlowResult with answer, step count, and live_view_urls for
+        every surface used (frontend surfaces these to the user).
         """
         try:
-            if config.mode == ExecutionMode.BROWSER_CUA:
-                return await self._run_browser_cua(config)
-
-            if config.mode == ExecutionMode.DESKTOP_TASK:
-                return await self._run_lightcone_task(config, kind="desktop")
-
-            if config.mode == ExecutionMode.BROWSER_TASK:
-                return await self._run_lightcone_task(config, kind="browser")
-
-            if config.mode == ExecutionMode.BATCH:
-                if not config.records or not config.instruction_template:
-                    raise ValueError(
-                        "BATCH mode requires both RunConfig.records and RunConfig.instruction_template"
-                    )
-                results = await self.run_batch(
-                    records=config.records,
-                    instruction_template=config.instruction_template,
-                    mode=ExecutionMode.DESKTOP_TASK,
-                    max_steps=config.max_steps,
-                    environment_id=config.environment_id,
-                    concurrency=config.concurrency,
-                )
-                combined = "\n---\n".join(r.answer for r in results)
-                return RunResult(
-                    answer=combined,
-                    steps=sum(r.steps for r in results),
-                    mode=config.mode,
-                    events=[e for r in results for e in r.events],
-                )
-
-            raise ValueError(f"Unknown execution mode: {config.mode!r}")
-
+            return await self._execute_flow(flow)
         except Exception as exc:
-            return RunResult(
-                answer="",
-                steps=0,
-                mode=config.mode,
-                ok=False,
-                error=str(exc),
-            )
+            return FlowResult(answer="", steps_taken=0, ok=False, error=str(exc))
 
-    # ── Convenience wrappers ──────────────────────────────────────────────────
+    # ── Flow execution ────────────────────────────────────────────────────────
 
-    async def run_browser_cua(
-        self,
-        task: str,
-        max_steps: int = 50,
-        stealth: bool = True,
-        viewport_width: int = 1280,
-        viewport_height: int = 800,
-    ) -> RunResult:
-        """
-        Kernel cloud browser + Northstar manual CUA loop.
-
-        Use this when:
-        - The task is web-based and you have precise coordinates or
-          annotated screenshots to guide the agent.
-        - You need to integrate images/annotations from the recorded flow.
-        - You want the tightest control over each step.
-
-        The live_view_url is surfaced so the user can watch in real time.
-        """
-        return await self._run_browser_cua(RunConfig(
-            mode=ExecutionMode.BROWSER_CUA,
-            task=task,
-            max_steps=max_steps,
-            stealth=stealth,
-            viewport_width=viewport_width,
-            viewport_height=viewport_height,
-        ))
-
-    async def run_desktop_task(
-        self,
-        task: str,
-        max_steps: int = 50,
-        environment_id: str | None = None,
-        persistent: bool = False,
-    ) -> RunResult:
-        """
-        Lightcone autonomous desktop task.
-
-        Use this when:
-        - The task involves native desktop apps (Excel, SAP, ERP, legacy software).
-        - You need multi-window or multi-application workflows.
-        - You have an existing environment (environment_id) with apps pre-installed.
-
-        Set persistent=True and save result.environment_id to reuse across runs.
-        """
-        return await self._run_lightcone_task(RunConfig(
-            mode=ExecutionMode.DESKTOP_TASK,
-            task=task,
-            max_steps=max_steps,
-            environment_id=environment_id,
-            persistent=persistent,
-        ), kind="desktop")
-
-    async def run_browser_task(
-        self,
-        task: str,
-        max_steps: int = 50,
-        environment_id: str | None = None,
-    ) -> RunResult:
-        """
-        Lightcone autonomous browser task.
-
-        Use this when:
-        - The task is web-only and you want full Northstar autonomy (no manual loop).
-        - You want to chain multiple pages/sites in one instruction.
-        """
-        return await self._run_lightcone_task(RunConfig(
-            mode=ExecutionMode.BROWSER_TASK,
-            task=task,
-            max_steps=max_steps,
-            environment_id=environment_id,
-        ), kind="browser")
-
-    async def run_batch(
-        self,
-        records: list[dict],
-        instruction_template: str,
-        mode: ExecutionMode = ExecutionMode.DESKTOP_TASK,
-        max_steps: int = 30,
-        environment_id: str | None = None,
-        concurrency: int = 1,
-    ) -> list[RunResult]:
-        """
-        Run the same task template for each record.
-
-        instruction_template uses Python str.format(**record):
-            "Go to CRM. Create contact {name} with email {email} in company {company}."
-
-        concurrency=1 (default) processes records one at a time.
-        concurrency>1 runs multiple in parallel — use carefully.
-
-        Returns one RunResult per record in the same order as records.
-        """
-        kind = "browser" if mode == ExecutionMode.BROWSER_TASK else "desktop"
-
-        if concurrency == 1:
-            results = []
-            for i, record in enumerate(records):
-                print(f"[batch {i+1}/{len(records)}] {record}")
-                result = await self._run_lightcone_task(RunConfig(
-                    mode=mode,
-                    task=instruction_template.format(**record),
-                    max_steps=max_steps,
-                    environment_id=environment_id,
-                ), kind=kind)
-                results.append(result)
-            return results
-
-        sem = asyncio.Semaphore(concurrency)
-
-        async def _one(i: int, record: dict) -> RunResult:
-            async with sem:
-                print(f"[batch {i+1}/{len(records)}] {record}")
-                return await self._run_lightcone_task(RunConfig(
-                    mode=mode,
-                    task=instruction_template.format(**record),
-                    max_steps=max_steps,
-                    environment_id=environment_id,
-                ), kind=kind)
-
-        return list(await asyncio.gather(*[_one(i, r) for i, r in enumerate(records)]))
-
-    # ── SOP entry point ───────────────────────────────────────────────────────
-
-    async def execute_sop(
-        self,
-        sop: SOP,
-        step_by_step: bool = False,
-    ) -> RunResult:
-        """
-        Execute a compiled SOP.
-
-        This is the primary backend entry point after the compiler (Claude) has
-        turned a recording into a structured plan.
-
-        Parameters
-        ----------
-        sop           The compiled SOP from the compiler.
-        step_by_step  If True and surface=BROWSER, use the Kernel+Northstar CUA
-                      loop with per-step visual grounding (each step sends its
-                      reference screenshot alongside the instruction).
-                      If False (default), flatten the SOP into one task prompt
-                      and run it end-to-end with the autonomous Task API.
-
-        Surface routing
-        ---------------
-        sop.surface == BROWSER  →  BROWSER_CUA (step_by_step=True)
-                                   or BROWSER_TASK (step_by_step=False)
-        sop.surface == DESKTOP  →  DESKTOP_TASK (always autonomous)
-
-        The mode choice:
-        - Use step_by_step=True when you have reference screenshots / annotations
-          and want the model to visually locate each element.
-        - Use step_by_step=False (default) for a simpler, more robust run where
-          Northstar figures out the whole flow from the NL description.
-        """
-        if sop.surface == Surface.DESKTOP:
-            return await self.run_desktop_task(
-                task=sop.to_task_prompt(),
-                max_steps=max(50, len(sop.steps) * 3),
-                environment_id=sop.environment_id,
-                persistent=sop.environment_id is not None,
-            )
-
-        # Browser surface
-        if step_by_step:
-            return await self._run_sop_step_by_step(sop)
-
-        # One-shot autonomous browser task
-        task = sop.to_task_prompt()
-        if sop.start_url:
-            return await self.run_browser_cua(
-                task=task,
-                max_steps=max(50, len(sop.steps) * 4),
-            )
-        return await self.run_browser_task(
-            task=task,
-            max_steps=max(50, len(sop.steps) * 3),
-            environment_id=sop.environment_id,
-        )
-
-    async def _run_sop_step_by_step(self, sop: SOP) -> RunResult:
-        """
-        Kernel browser + Northstar, one Northstar call per SOP step.
-
-        Each step sends:
-          - The step instruction (intent + action detail)
-          - The current live screenshot
-          - The reference screenshot from the recording (if available)
-
-        This gives Northstar visual grounding so it can find elements even
-        when coordinates have shifted between recording and replay.
-        """
-        from kernel import AsyncKernel
-        from tzafon import AsyncLightcone
-        from app.infra.northstar_kernel import _capture, _computer_tool, _execute_action, _find_computer_call, _extract_text
-
-        if not self._kernel_key:
-            raise ValueError("KERNEL_API_KEY is required for step-by-step browser execution")
-        if not self._lightcone_key:
-            raise ValueError("TZAFON_API_KEY is required for step-by-step browser execution")
-
-        kernel = AsyncKernel(api_key=self._kernel_key)
-        lc = AsyncLightcone(api_key=self._lightcone_key)
-
-        session = await kernel.browsers.create(
-            stealth=True,
-            viewport={"width": 1280, "height": 800},
-        )
-        sid = session.session_id
-        live_url: str = getattr(session, "browser_live_view_url", "") or ""
-        print(f"[kernel] browser {sid} (live: {live_url})")
-
-        total_steps = 0
+    async def _execute_flow(self, flow: FlowRequest) -> FlowResult:
+        opts = flow.options
+        live_view_urls: dict[str, str] = {}
         all_events: list[Any] = []
+        total_steps = 0
         answer = ""
-        step_prompts = sop.to_step_prompts()
+        env_id: str | None = opts.environment_id
+
+        # Lazy-created SDK clients and open sessions (kept across handoffs)
+        kernel_sdk: Any = None
+        lc_sdk: Any = None
+        kernel_session_id: str | None = None
+        kernel_replay_id: str | None = None
+        lightcone_computer_id: str | None = None
 
         try:
-            # Navigate to start URL if provided
-            if sop.start_url:
-                await kernel.browsers.playwright.execute(
-                    sid,
-                    code=f"await page.goto({sop.start_url!r}); await page.waitForLoadState('networkidle');",
-                )
-                await asyncio.sleep(1.0)
+            # Group consecutive steps by (target, strategy) to batch them
+            groups = _group_steps(flow)
 
-            for step_i, (step, prompt) in enumerate(zip(sop.steps, step_prompts)):
-                print(f"\n[sop step {step_i + 1}/{len(sop.steps)}] {step.intent}")
+            for group_target, group_strategy, group_steps in groups:
+                # ── AUTONOMOUS ──────────────────────────────────────────────
+                if group_strategy == ExecutionStrategy.AUTONOMOUS:
+                    lc_sdk = lc_sdk or _make_lc(self._lightcone_key)
+                    prompt = _steps_to_prompt(flow, group_steps)
+                    kind = (
+                        "browser"
+                        if group_target == RunTarget.KERNEL_BROWSER
+                        else "desktop"
+                    )
+                    from app.infra.lightcone import LightconeClient
+                    lc_client = LightconeClient(api_key=self._lightcone_key)
+                    result = await lc_client.run_task_collect(
+                        instruction=prompt,
+                        kind=kind,
+                        max_steps=opts.max_total_actions,
+                        environment_id=env_id,
+                        verbose=True,
+                    )
+                    answer = result.answer or answer
+                    total_steps += result.steps
+                    all_events.extend(result.events)
+                    continue
 
-                live_b64 = await _capture(kernel, sid)
-
-                # Build input: instruction + live screenshot + optional reference screenshot
-                content: list[dict] = [
-                    {"type": "input_text", "text": prompt},
-                    {
-                        "type": "input_image",
-                        "image_url": f"data:image/png;base64,{live_b64}",
-                        "detail": "auto",
-                    },
-                ]
-                if step.screenshot_b64:
-                    content.append({
-                        "type": "input_text",
-                        "text": "Reference screenshot from the original recording (use this to identify the target element):",
-                    })
-                    content.append({
-                        "type": "input_image",
-                        "image_url": f"data:image/png;base64,{step.screenshot_b64}",
-                        "detail": "auto",
-                    })
-
-                response = await lc.responses.create(
-                    model="tzafon.northstar-cua-fast",
-                    input=[{"role": "user", "content": content}],
-                    tools=[_computer_tool(1280, 800)],
-                )
-
-                # Inner CUA loop for this step (max 10 actions per step)
-                for _ in range(10):
-                    cc = _find_computer_call(response)
-                    if not cc:
-                        break
-                    action = cc.action
-                    action_type = getattr(action, "type", "")
-                    total_steps += 1
-                    all_events.append({"sop_step": step_i + 1, "action": action_type})
-
-                    if action_type in ("terminate", "done", "answer"):
-                        answer = (
-                            getattr(action, "text", "")
-                            or getattr(action, "answer", "")
-                            or _extract_text(response)
+                # ── DIRECT (replay without model) ────────────────────────────
+                if group_strategy == ExecutionStrategy.DIRECT:
+                    for step in group_steps:
+                        await self._execute_step_direct(
+                            step, group_target, kernel_sdk, kernel_session_id,
+                            lc_sdk, lightcone_computer_id, opts
                         )
-                        break
+                        total_steps += 1
+                    continue
 
-                    await _execute_action(kernel, sid, action)
-                    await asyncio.sleep(1.0)
+                # ── CUA LOOP ─────────────────────────────────────────────────
+                if group_target == RunTarget.KERNEL_BROWSER:
+                    # Ensure Kernel session exists
+                    if kernel_sdk is None:
+                        from kernel import AsyncKernel
+                        kernel_sdk = AsyncKernel(api_key=self._kernel_key)
+                    if kernel_session_id is None:
+                        sess = await kernel_sdk.browsers.create(
+                            stealth=opts.stealth,
+                            viewport={"width": opts.viewport_width, "height": opts.viewport_height},
+                        )
+                        kernel_session_id = sess.session_id
+                        url = getattr(sess, "browser_live_view_url", None) or ""
+                        if url:
+                            live_view_urls["kernel_browser"] = url
+                        print(f"[kernel] browser {kernel_session_id} (live: {url})")
+                        if url and self._open_live_views:
+                            import subprocess as _sp
+                            _sp.Popen(["open", url])
 
-                    new_b64 = await _capture(kernel, sid)
-                    response = await lc.responses.create(
-                        model="tzafon.northstar-cua-fast",
-                        previous_response_id=response.id,
-                        input=[{
-                            "type": "computer_call_output",
-                            "call_id": cc.call_id,
-                            "output": {
-                                "type": "input_image",
-                                "image_url": f"data:image/png;base64,{new_b64}",
-                                "detail": "auto",
-                            },
-                        }],
-                        tools=[_computer_tool(1280, 800)],
+                        # Start replay recording
+                        try:
+                            replay = await kernel_sdk.browsers.replays.start(kernel_session_id)
+                            kernel_replay_id = replay.replay_id
+                            print(f"[kernel] replay recording started: {kernel_replay_id}")
+                        except Exception as e:
+                            print(f"[kernel] replay start failed (non-fatal): {e}")
+
+                    if lc_sdk is None:
+                        lc_sdk = _make_lc(self._lightcone_key)
+
+                    # Navigate to start URL on first browser group
+                    if flow.start_url and not live_view_urls.get("_browser_started"):
+                        await kernel_sdk.browsers.playwright.execute(
+                            kernel_session_id,
+                            code=f"await page.goto({flow.start_url!r}); "
+                                 "await page.waitForLoadState('networkidle');",
+                        )
+                        await asyncio.sleep(1.0)
+                        live_view_urls["_browser_started"] = "1"
+
+                    backend = KernelBrowserBackend(kernel_sdk, kernel_session_id)
+                    ans, n, evs = await self._run_group_cua(
+                        lc_sdk, backend, flow, group_steps, opts,
+                        environment="browser",
                     )
 
-                if step.wait_ms:
-                    await asyncio.sleep(step.wait_ms / 1000)
+                elif group_target == RunTarget.LIGHTCONE_OS:
+                    if lc_sdk is None:
+                        lc_sdk = _make_lc(self._lightcone_key)
+                    if lightcone_computer_id is None:
+                        raw = await lc_sdk.computers.create(
+                            kind="desktop",
+                            persistent=opts.environment_id is not None,
+                            **( {"environment_id": env_id} if env_id else {} ),
+                        )
+                        lightcone_computer_id = raw.id
+                        env_id = env_id or raw.id
+                        endpoints = getattr(raw, "endpoints", {}) or {}
+                        debug_path = endpoints.get("debug")
+                        if debug_path:
+                            live_view_urls["lightcone_os"] = f"https://api.tzafon.ai{debug_path}"
+                        lc_live = live_view_urls.get("lightcone_os", "")
+                        print(f"[lightcone] computer {lightcone_computer_id} (live: {lc_live})")
+                        if lc_live and self._open_live_views:
+                            import subprocess as _sp
+                            print(f"[lightcone] opening live view in browser...")
+                            _sp.Popen(["open", lc_live])
 
-            if not answer:
-                answer = _extract_text(response)
+                    backend = LightconeOSBackend(lc_sdk, lightcone_computer_id)
+                    ans, n, evs = await self._run_group_cua(
+                        lc_sdk, backend, flow, group_steps, opts,
+                        environment="desktop",
+                    )
+
+                elif group_target == RunTarget.LOCAL:
+                    if lc_sdk is None:
+                        lc_sdk = _make_lc(self._lightcone_key)
+                    backend = LocalCUABackend()
+                    ans, n, evs = await self._run_group_cua(
+                        lc_sdk, backend, flow, group_steps, opts,
+                        environment="desktop",
+                    )
+                else:
+                    raise ValueError(f"Unhandled target: {group_target!r}")
+
+                answer = ans or answer
+                total_steps += n
+                all_events.extend(evs)
 
         finally:
-            try:
-                await kernel.browsers.delete_by_id(sid)
-            except Exception:
-                pass
+            # Clean up sessions
+            if kernel_session_id and kernel_sdk:
+                if kernel_replay_id:
+                    try:
+                        await kernel_sdk.browsers.replays.stop(
+                            replay_id=kernel_replay_id,
+                            id=kernel_session_id,
+                        )
+                        print(f"[kernel] replay stopped: {kernel_replay_id}")
+                    except Exception as e:
+                        print(f"[kernel] replay stop failed (non-fatal): {e}")
+                try:
+                    await kernel_sdk.browsers.delete_by_id(kernel_session_id)
+                    print(f"[kernel] session {kernel_session_id} deleted")
+                except Exception:
+                    pass
+            if lightcone_computer_id and lc_sdk and not opts.environment_id:
+                try:
+                    await lc_sdk.computers.delete(lightcone_computer_id)
+                    print(f"[lightcone] computer {lightcone_computer_id} deleted")
+                except Exception:
+                    pass
 
-        return RunResult(
+        live_view_urls.pop("_browser_started", None)
+        return FlowResult(
             answer=answer,
-            steps=total_steps,
-            mode=ExecutionMode.BROWSER_CUA,
-            live_view_url=live_url or None,
+            steps_taken=total_steps,
+            live_view_urls=live_view_urls,
+            environment_id=env_id,
+            replay_id=kernel_replay_id,
             events=all_events,
         )
 
-    # ── Internal executors ────────────────────────────────────────────────────
-
-    async def _run_browser_cua(self, config: RunConfig) -> RunResult:
-        """Kernel + Northstar manual loop."""
-        from app.infra.northstar_kernel import NorthstarKernelAgent
-
-        if not self._kernel_key:
-            raise ValueError("KERNEL_API_KEY is required for BROWSER_CUA mode")
-        if not self._lightcone_key:
-            raise ValueError("TZAFON_API_KEY is required for BROWSER_CUA mode")
-
-        agent = NorthstarKernelAgent(
-            kernel_api_key=self._kernel_key,
-            lightcone_api_key=self._lightcone_key,
-            viewport_width=config.viewport_width,
-            viewport_height=config.viewport_height,
-        )
-
-        # Temporarily capture the live_view_url printed by the agent
-        live_url: str | None = None
-        _orig_print = __builtins__["print"] if isinstance(__builtins__, dict) else print
-
-        import builtins
-        _real_print = builtins.print
-
-        def _intercept(*args, **kwargs):
-            text = " ".join(str(a) for a in args)
-            nonlocal live_url
-            if "live:" in text and live_url is None:
-                # "[kernel] browser <id> (live: <url>)"
-                start = text.find("(live: ") + 7
-                end = text.find(")", start)
-                if start > 7 and end > start:
-                    live_url = text[start:end]
-            _real_print(*args, **kwargs)
-
-        builtins.print = _intercept
-        try:
-            agent_result = await agent.run(
-                task=config.task,
-                max_steps=config.max_steps,
-                stealth=config.stealth,
-            )
-        finally:
-            builtins.print = _real_print
-
-        return RunResult(
-            answer=agent_result.answer,
-            steps=agent_result.steps,
-            mode=config.mode,
-            live_view_url=live_url,
-            events=agent_result.events,
-        )
-
-    async def _run_lightcone_task(
+    async def _run_group_cua(
         self,
-        config: RunConfig,
-        kind: str,
-    ) -> RunResult:
-        """Lightcone autonomous Task API."""
-        from app.infra.lightcone import LightconeClient
+        lc_sdk: Any,
+        backend: CUABackend,
+        flow: FlowRequest,
+        steps: list[SOPStep],
+        opts: RunOptions,
+        environment: str,
+    ) -> tuple[str, int, list[Any]]:
+        """
+        Run a group of steps via the CUA loop on a given backend.
 
-        if not self._lightcone_key:
-            raise ValueError("TZAFON_API_KEY is required for DESKTOP_TASK / BROWSER_TASK mode")
+        Each step gets its own Northstar call seeded with:
+          - The step instruction (intent + action detail)
+          - The current live screenshot
+          - The reference screenshot from the recording (if present)
+        """
+        total_answer = ""
+        total_actions = 0
+        total_events: list[Any] = []
 
-        client = LightconeClient(api_key=self._lightcone_key)
-        live_url: str | None = None
-        env_id: str | None = config.environment_id
+        for step in steps:
+            print(f"  [cua] {step.intent[:80]}")
 
-        if config.persistent and not env_id:
-            # Create a fresh persistent environment; caller saves the id for next run
-            sess = await client.create_persistent_computer(kind=kind)
-            live_url = sess.live_view_url
-            env_id = sess.id
-            await sess.delete()
-
-        elif env_id:
-            # Peek at the live view URL if we can (best-effort)
-            try:
-                sess = await client.create_computer(
-                    kind=kind,
-                    persistent=True,
-                    environment_id=env_id,
+            # For browser steps with a URL, pre-navigate via Playwright so Northstar
+            # starts on the loaded page rather than wasting actions navigating.
+            if (
+                environment == "browser"
+                and step.action == ActionType.NAVIGATE
+                and step.text
+                and isinstance(backend, KernelBrowserBackend)
+            ):
+                print(f"  [playwright] → {step.text}")
+                await backend._k.browsers.playwright.execute(
+                    backend._sid,
+                    code=(
+                        f"await page.goto({step.text!r}); "
+                        "await page.waitForLoadState('networkidle');"
+                    ),
                 )
-                live_url = sess.live_view_url
-                await sess.delete()
-            except Exception:
-                pass
+                await asyncio.sleep(1.5)
 
-        agent_result = await client.run_task_collect(
-            instruction=config.task,
-            kind=kind,
-            max_steps=config.max_steps,
-            environment_id=env_id,
-            verbose=True,
-        )
+            live_b64 = await backend.screenshot_b64()
+            content = _build_step_content(step, live_b64)
 
-        return RunResult(
-            answer=agent_result.answer,
-            steps=agent_result.steps,
-            mode=config.mode,
-            live_view_url=live_url,
-            environment_id=env_id,
-            events=agent_result.events,
+            ans, n, evs = await _run_cua_loop(
+                lc_sdk=lc_sdk,
+                backend=backend,
+                initial_content=content,
+                model=self.MODEL,
+                width=opts.viewport_width,
+                height=opts.viewport_height,
+                environment=environment,
+                max_actions=opts.max_actions_per_step,
+                step_delay_ms=opts.step_delay_ms,
+            )
+            total_answer = ans or total_answer
+            total_actions += n
+            total_events.extend(evs)
+
+            if step.wait_ms:
+                await asyncio.sleep(step.wait_ms / 1000)
+
+        return total_answer, total_actions, total_events
+
+    async def _execute_step_direct(
+        self,
+        step: SOPStep,
+        target: RunTarget,
+        kernel_sdk: Any,
+        kernel_session_id: str | None,
+        lc_sdk: Any,
+        lightcone_computer_id: str | None,
+        opts: RunOptions,
+    ) -> None:
+        """Execute a step directly from its recorded coordinates (no model call)."""
+        if target == RunTarget.KERNEL_BROWSER and kernel_session_id:
+            backend = KernelBrowserBackend(kernel_sdk, kernel_session_id)
+        elif target == RunTarget.LIGHTCONE_OS and lightcone_computer_id:
+            backend = LightconeOSBackend(lc_sdk, lightcone_computer_id)
+        elif target == RunTarget.LOCAL:
+            backend = LocalCUABackend()
+        else:
+            return
+
+        # Build a synthetic action-like namespace from the step fields
+        import types as _t
+        action = _t.SimpleNamespace(
+            type=step.action.value,
+            x=step.x,
+            y=step.y,
+            end_x=step.end_x,
+            end_y=step.end_y,
+            text=step.text,
+            keys=step.keys,
+            scroll_x=step.dx,
+            scroll_y=step.dy,
+            url=step.text if step.action == ActionType.NAVIGATE else None,
         )
+        await backend.execute_action(action)
+        if step.wait_ms:
+            await asyncio.sleep(step.wait_ms / 1000)
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _make_lc(key: str | None) -> Any:
+    if not key:
+        raise ValueError(
+            "TZAFON_API_KEY is required for Lightcone OS and CUA model decisions."
+        )
+    from tzafon import AsyncLightcone
+    return AsyncLightcone(api_key=key)
+
+
+def _group_steps(
+    flow: FlowRequest,
+) -> list[tuple[RunTarget, ExecutionStrategy, list[SOPStep]]]:
+    """
+    Group consecutive steps that share the same (resolved_target, strategy).
+    Each group becomes one session or one prompt.
+    """
+    if not flow.steps:
+        return []
+
+    groups: list[tuple[RunTarget, ExecutionStrategy, list[SOPStep]]] = []
+    current_target = flow.resolved_target(flow.steps[0])
+    current_strategy = flow.resolved_strategy(flow.steps[0])
+    current_group: list[SOPStep] = []
+
+    for step in flow.steps:
+        t = flow.resolved_target(step)
+        s = flow.resolved_strategy(step)
+        if t == current_target and s == current_strategy:
+            current_group.append(step)
+        else:
+            groups.append((current_target, current_strategy, current_group))
+            current_target, current_strategy, current_group = t, s, [step]
+
+    groups.append((current_target, current_strategy, current_group))
+    return groups
+
+
+def _steps_to_prompt(flow: FlowRequest, steps: list[SOPStep]) -> str:
+    """Flatten a subset of steps to a natural-language task prompt."""
+    parts = []
+    if flow.context:
+        parts.append(flow.context.strip())
+    if flow.start_url:
+        parts.append(f"Start at: {flow.start_url}")
+    parts.append(f"Goal: {flow.goal}")
+    parts.append("Steps:")
+    for i, step in enumerate(steps, 1):
+        line = f"  {i}. {step.intent}"
+        if step.action == ActionType.NAVIGATE and step.text:
+            line += f" → {step.text}"
+        elif step.action == ActionType.TYPE and step.text:
+            line += f' → type "{step.text}"'
+        elif step.action == ActionType.HOTKEY and step.keys:
+            line += f" → {'+'.join(step.keys)}"
+        parts.append(line)
+    return "\n".join(parts)
+
+
+def _build_step_content(step: SOPStep, live_b64: str) -> list[dict]:
+    """
+    Build the `content` array for one CUA loop iteration.
+
+    Always includes:
+      - The step instruction text
+      - The current live screenshot
+
+    Also includes (when available):
+      - The reference screenshot from the recording
+      - A note describing the annotation (bounding box)
+    """
+    instruction = step.intent
+    if step.action == ActionType.TYPE and step.text:
+        instruction += f' Type: "{step.text}"'
+    elif step.action == ActionType.NAVIGATE and step.text:
+        instruction += f" Navigate to: {step.text}"
+    elif step.action == ActionType.HOTKEY and step.keys:
+        instruction += f" Press: {'+'.join(step.keys)}"
+    elif step.description:
+        instruction += f" Target: {step.description}"
+
+    mime = "image/jpeg" if live_b64.startswith("/9j/") else "image/png"
+    content: list[dict] = [
+        {"type": "input_text", "text": instruction},
+        {
+            "type": "input_image",
+            "image_url": f"data:{mime};base64,{live_b64}",
+            "detail": "auto",
+        },
+    ]
+
+    if step.screenshot_b64:
+        note = "Reference screenshot from the recording (use to identify the target element)"
+        if step.annotation:
+            a = step.annotation
+            note += (
+                f" — the target is highlighted at "
+                f"x={a.get('x')}, y={a.get('y')}, "
+                f"w={a.get('w')}, h={a.get('h')}"
+            )
+        content.append({"type": "input_text", "text": note + ":"})
+        content.append({
+            "type": "input_image",
+            "image_url": f"data:image/png;base64,{step.screenshot_b64}",
+            "detail": "auto",
+        })
+
+    return content

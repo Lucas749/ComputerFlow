@@ -1,0 +1,186 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://computerflow.ai/schemas/workflow.v1.json",
+  "title": "ComputerFlow Workflow",
+  "description": "A compiled Standard Operating Procedure produced by the ComputerFlow compiler.",
+  "type": "object",
+  "required": ["id", "schemaVersion", "name", "steps"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique workflow identifier — \"wf_\" + nanoid",
+      "pattern": "^wf_"
+    },
+    "schemaVersion": {
+      "type": "integer",
+      "description": "Increment when the schema has a breaking change.",
+      "enum": [1]
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable workflow name."
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source": {
+      "type": "object",
+      "required": ["kind", "videoPath"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["recording"]
+        },
+        "videoPath": {
+          "type": "string",
+          "description": "Relative path to the source video inside the workflow directory."
+        },
+        "telemetryPath": {
+          "type": "string",
+          "description": "Relative path to the .events.json telemetry file."
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "router": {
+          "type": "string",
+          "enum": ["auto", "kernel", "northstar"],
+          "default": "auto"
+        },
+        "background": {
+          "type": "boolean",
+          "default": true
+        },
+        "concurrency": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        }
+      }
+    },
+    "variables": {
+      "type": "array",
+      "description": "Workflow-level input variables surfaced to the operator.",
+      "items": {
+        "type": "object",
+        "required": ["name", "type"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "type": { "type": "string", "enum": ["string", "number", "boolean"] },
+          "default": {},
+          "description": { "type": "string" }
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "description": "Ordered list of SOP steps.",
+      "items": {
+        "type": "object",
+        "required": ["id", "n", "action", "target"],
+        "additionalProperties": true,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Step ID — \"s1\", \"s2\", etc.",
+            "pattern": "^s[0-9]+"
+          },
+          "n": {
+            "type": "integer",
+            "description": "1-based step number.",
+            "minimum": 1
+          },
+          "action": {
+            "type": "string",
+            "description": "Action verb.",
+            "enum": [
+              "navigate", "click", "double_click", "right_click",
+              "drag", "scroll", "hscroll", "type", "hotkey",
+              "wait", "screenshot", "extract"
+            ]
+          },
+          "target": {
+            "type": "object",
+            "description": "How the target element is identified.",
+            "required": ["kind"],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["url", "selector", "description", "vlm", "coordinate"]
+              },
+              "value": { "type": "string" },
+              "description": { "type": "string" }
+            }
+          },
+          "value": {
+            "description": "Payload for the action — string literal or variable reference.",
+            "oneOf": [
+              { "type": "string" },
+              { "type": "null" },
+              {
+                "type": "object",
+                "required": ["kind", "ref"],
+                "properties": {
+                  "kind": { "type": "string", "enum": ["var"] },
+                  "ref": { "type": "string" }
+                }
+              }
+            ]
+          },
+          "executor": {
+            "type": "object",
+            "description": "Which execution engine handles this step.",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["kernel", "computer_use", "northstar", "local"]
+              },
+              "entryFn": { "type": "string" },
+              "args": { "type": "object" }
+            }
+          },
+          "screenshot": {
+            "type": "string",
+            "description": "Relative path to the reference screenshot for this step."
+          },
+          "approved": {
+            "type": "boolean",
+            "default": false
+          },
+          "needsReview": {
+            "type": "boolean",
+            "default": false
+          },
+          "notes": {
+            "type": "string",
+            "default": ""
+          }
+        }
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "description": "Declared output fields extracted during execution.",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "type": { "type": "string" },
+          "description": { "type": "string" }
+        }
+      }
+    }
+  }
+}
