@@ -19,27 +19,6 @@
 
 ComputerFlow is a macOS menu-bar app paired with a FastAPI backend that turns screen recordings into executable workflows. Record yourself doing a task once, let a VLM compile the recording into a structured SOP, review and edit the steps, then replay it in the cloud with a Computer Use Agent driving either a headless browser or a Linux desktop.
 
-## Screenshots
-
-<table>
-  <tr>
-    <td width="50%"><img src="screenshots/kernel_pwvv9ql7_step02_frame008.png" alt="Kernel browser agent mid-run"></td>
-    <td width="50%"><img src="screenshots/kernel_yx45acs4_step01_frame005.png" alt="Northstar CUA driving a browser step"></td>
-  </tr>
-  <tr>
-    <td align="center"><sub>Kernel cloud Chromium — agent executing a browser workflow</sub></td>
-    <td align="center"><sub>Live per-frame screenshot streamed back to the Mac app</sub></td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="screenshots/lightcone_final_43095516.jpg" alt="Lightcone desktop final frame"></td>
-    <td width="50%"><img src="screenshots/kernel_m1wqbha8_step03_frame010.png" alt="Multi-step browser run"></td>
-  </tr>
-  <tr>
-    <td align="center"><sub>Lightcone OS — full Linux desktop automation</sub></td>
-    <td align="center"><sub>Multi-step workflow running headlessly in the cloud</sub></td>
-  </tr>
-</table>
-
 ## How it works
 
 The pipeline has four stages, driven from the Mac app's menu-bar icon:
